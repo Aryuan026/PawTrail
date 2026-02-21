@@ -1,0 +1,2808 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PawTrail</title>
+  <style>
+    :root {
+      --bg: #f7f7f8;
+      --panel: #ffffff;
+      --panel-2: #f4f5f7;
+      --text: #1f2328;
+      --muted: #66707d;
+      --accent: #171717;
+      --accent-2: #2f5bff;
+      --border: #e5e7eb;
+      --user-bg: #eaf2ff;
+      --user-border: #c6d9ff;
+      --char-bg: #ffffff;
+      --char-border: #e5e7eb;
+      --mark-bg: #ffe58f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", "PingFang SC", "Helvetica Neue", "Noto Sans CJK SC", -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+    }
+    header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    header h1 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: 0.01em; }
+    header .sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .head-main { min-width: 0; }
+    .head-badge {
+      background: #f3f4f6;
+      color: #4b5563;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 10px 16px 0;
+    }
+    .tab-btn {
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: #4b5563;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .tab-btn.active {
+      background: #111827;
+      color: #ffffff;
+      border-color: #111827;
+    }
+    .page {
+      display: none;
+    }
+    .page.active {
+      display: grid;
+    }
+    main { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 70vh;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+    }
+    .panel h2 { font-size: 12px; margin: 0 0 12px 0; color: var(--muted); font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; }
+    .field { margin-bottom: 10px; }
+    .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+    .field input[type="file"],
+    .field input[type="number"],
+    .field input[type="text"],
+    .field input[type="search"],
+    .field select {
+      width: 100%;
+      padding: 7px 8px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      padding: 7px 11px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.01em;
+    }
+    .btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+    .btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .list { border: 1px solid var(--border); border-radius: 8px; padding: 8px; max-height: 260px; overflow: auto; background: #fbfbfc; }
+    .list .item { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px dashed #e5e7eb; }
+    .list .item:last-child { border-bottom: none; }
+    .item .meta { color: var(--muted); font-size: 11px; }
+    .window-title { font-size: 11px; line-height: 1.3; font-weight: 600; color: #222a33; }
+    .months .item { cursor: pointer; }
+    .months .item.active { background: #edf2ff; border-radius: 6px; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .preview-controls {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #fafafa;
+    }
+    .search-row { align-items: center; }
+    .search-row input[type="search"] { flex: 1; min-width: 220px; }
+    .search-row select { width: 130px; }
+    #searchStatus { margin-top: 6px; font-size: 11px; }
+    .export-row { margin-top: 8px; }
+    .help-note {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #667085;
+      line-height: 1.45;
+    }
+    .option-group {
+      margin-top: 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #ffffff;
+    }
+    .option-group summary {
+      cursor: pointer;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .option-group summary::-webkit-details-marker {
+      display: none;
+    }
+    .option-group summary::after {
+      content: "展开";
+      font-size: 11px;
+      color: #6b7280;
+      font-weight: 500;
+    }
+    .option-group[open] summary::after {
+      content: "收起";
+    }
+    .option-group-body {
+      border-top: 1px dashed var(--border);
+      padding: 8px 10px 10px;
+    }
+    .preview {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fafbfc;
+      max-height: calc(70vh - 14px);
+      overflow: auto;
+    }
+    .chat-window {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      background: #ffffff;
+    }
+    .chat-window-head {
+      padding: 8px 10px;
+      border-bottom: 1px solid #eceff3;
+      font-size: 11px;
+      color: var(--muted);
+      background: #f9fafb;
+      border-top-left-radius: 10px;
+      border-top-right-radius: 10px;
+    }
+    .chat-window-body {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .msg-row {
+      display: flex;
+      width: 100%;
+    }
+    .msg-row.user {
+      justify-content: flex-end;
+    }
+    .msg-row.assistant {
+      justify-content: flex-start;
+    }
+    .bubble {
+      max-width: 78%;
+      padding: 8px 10px;
+      border-radius: 14px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+    }
+    .bubble.user {
+      background: var(--user-bg);
+      border: 1px solid var(--user-border);
+      border-bottom-right-radius: 6px;
+    }
+    .bubble.assistant {
+      background: var(--char-bg);
+      border: 1px solid var(--char-border);
+      border-bottom-left-radius: 6px;
+    }
+    .bubble .meta {
+      font-size: 10px;
+      color: #6b7280;
+      opacity: 0.95;
+      margin-bottom: 4px;
+    }
+    mark {
+      background: var(--mark-bg);
+      color: inherit;
+      padding: 0 1px;
+      border-radius: 2px;
+    }
+    .review-main {
+      grid-template-columns: 1.2fr 0.8fr;
+      align-items: stretch;
+    }
+    .review-panel {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 220px);
+      min-height: 620px;
+    }
+    .review-panel .preview {
+      flex: 1;
+      min-height: 0;
+      max-height: none;
+    }
+    .review-panel .topic-list {
+      flex: 1;
+      min-height: 0;
+      max-height: none;
+    }
+    .review-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .topic-marker {
+      background: #fff8e6;
+      border: 1px solid #f5d08a;
+      border-radius: 4px;
+      padding: 7px 9px;
+      font-size: 11px;
+      color: #8a4f00;
+      font-family: "SF Mono", Menlo, Monaco, monospace;
+    }
+    .topic-marker.focus {
+      outline: 1px solid #93c5fd;
+      background: #dbeafe;
+      color: #1e3a8a;
+    }
+    .jump-focus {
+      outline: 1px solid #93c5fd;
+      background: #eaf3ff;
+      border-radius: 4px;
+    }
+    .anchor-chip {
+      display: inline-block;
+      font-family: "SF Mono", Menlo, Monaco, monospace;
+      font-size: 10px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      border: 1px solid #d8dee8;
+      color: #475467;
+      background: #f8fafc;
+      width: fit-content;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+    .anchor-chip.msg {
+      background: #eef2ff;
+      border-color: #c7d2fe;
+      color: #3730a3;
+    }
+    .anchor-chip.pickable {
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .anchor-chip.pickable:hover {
+      border-color: #8ea5ff;
+      background: #e4e9ff;
+    }
+    .anchor-chip.selected {
+      border-color: #3658ff;
+      background: #dbe4ff;
+      box-shadow: 0 0 0 1px rgba(54, 88, 255, 0.25) inset;
+    }
+    .anchor-chip.topic {
+      background: #ecfeff;
+      border-color: #a5f3fc;
+      color: #155e75;
+    }
+    .plain-line {
+      white-space: pre-wrap;
+      font-family: "SF Mono", Menlo, Monaco, monospace;
+      font-size: 11px;
+      color: #475467;
+    }
+    .system-note {
+      font-size: 11px;
+      color: #6b7280;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 6px 8px;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .topic-list {
+      max-height: 62vh;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fbfbfc;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+    .topic-row {
+      border-bottom: 1px dashed #e5e7eb;
+      padding: 10px 8px;
+      border-left: 3px solid #d8e2ff;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: #f8fbff;
+    }
+    .topic-row:last-child {
+      border-bottom: none;
+    }
+    .topic-id {
+      font-family: "SF Mono", Menlo, Monaco, monospace;
+      font-size: 13px;
+      color: #111827;
+      font-weight: 600;
+    }
+    .topic-meta {
+      color: #6b7280;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .topic-edit {
+      margin-top: 6px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .topic-edit input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      background: #fff;
+      color: #111827;
+    }
+    .topic-muted {
+      color: #9ca3af;
+      text-decoration: line-through;
+    }
+    @media (max-width: 1080px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+      .review-main {
+        grid-template-columns: 1fr;
+      }
+      .review-panel {
+        height: auto;
+        min-height: 0;
+      }
+      .panel {
+        min-height: auto;
+      }
+      .preview {
+        max-height: 56vh;
+      }
+    }
+    footer { color: var(--muted); font-size: 11px; padding: 0 16px 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="head-main">
+      <h1>PawTrail</h1>
+      <div class="sub">把你和 AI 并肩走过的对话，整理成可回看的时间足迹</div>
+    </div>
+    <div class="head-badge">PawTrail · Memory Trail</div>
+  </header>
+  <div class="tabs">
+    <button class="tab-btn active" data-page="pageExport">批量导出</button>
+    <button class="tab-btn" data-page="pageReview">Topic审阅</button>
+  </div>
+  <main id="pageExport" class="page active">
+    <section class="panel">
+      <h2>数据加载</h2>
+      <div class="field">
+        <label>上传 conversations.json</label>
+        <input id="convFile" type="file" accept="application/json,.json" />
+      </div>
+      <div class="row">
+        <button class="btn" id="parseBtn">解析并加载</button>
+        <button class="btn secondary" id="clearBtn">清空</button>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label>最小消息数过滤（隐藏短窗口）</label>
+        <input id="minCount" type="number" min="0" value="3" />
+      </div>
+      <div class="field">
+        <label>月份列表</label>
+        <div class="list months" id="monthList">未加载</div>
+      </div>
+      <div class="field">
+        <label>当月窗口列表（可多选）</label>
+        <div class="list" id="windowList">请选择月份</div>
+      </div>
+      <div class="row">
+        <button class="btn secondary" id="selectAllBtn">全选</button>
+        <button class="btn secondary" id="selectAllGlobalBtn">全局全选</button>
+        <button class="btn ghost" id="clearSelectBtn">清空</button>
+        <button class="btn ghost" id="exportMdBtn">导出勾选md</button>
+      </div>
+      <div class="muted" id="status" style="margin-top:8px;"></div>
+    </section>
+
+    <section class="panel">
+      <h2>聊天预览</h2>
+      <div class="preview-controls">
+        <div class="field">
+          <label>导出文件名</label>
+          <input id="exportName" type="text" value="pawtrail-archive" />
+        </div>
+        <div class="row" style="align-items:center; justify-content:space-between;">
+          <label class="muted"><input id="withAnchors" type="checkbox" checked /> 附加 ^msg-锚点</label>
+          <select id="msgAnchorStyle" style="max-width:260px;">
+            <option value="custom" selected>锚点样式：仅自定义（推荐）</option>
+            <option value="classic">锚点样式：仅经典 (^msg-000001)</option>
+            <option value="dual">锚点样式：经典 + 全局唯一</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:6px;">
+          <label>自定义锚点模板（dual/custom 时生效）</label>
+          <input id="msgAnchorTemplate" type="text" value="m-{scope}-{conv}-{msg}" />
+          <div class="help-note">可用变量：{scope} {conv} {window} {day} {msg} {g}。示例：m-{scope}-{conv}-{msg}</div>
+        </div>
+        <div class="row export-row">
+          <button class="btn secondary" id="exportWindowZipBtn">按窗口批量ZIP</button>
+          <button class="btn secondary" id="exportDayZipBtn">按天重拼ZIP</button>
+        </div>
+        <details class="option-group">
+          <summary>Topic 导出选项</summary>
+          <div class="option-group-body">
+            <div class="row" style="align-items:center;">
+              <label class="muted"><input id="withTopicSections" type="checkbox" /> 启用 topic 分段</label>
+              <label class="muted"><input id="withTopicMarkers" type="checkbox" /> 调试模式：输出 topic 注释</label>
+              <label class="muted"><input id="withObsidianLinks" type="checkbox" checked /> 生成 INDEX 双链</label>
+              <label class="muted"><input id="withTopicCsv" type="checkbox" checked /> 导出主题索引CSV</label>
+            </div>
+            <div class="help-note">不勾选“启用 topic 分段”时，导出为原始批量 MD（无 topic 标题/注释）。启用 topic 分段后会自动附加 ^msg 锚点用于定位。</div>
+            <div class="field" style="margin-top:8px;">
+              <label>topic 间隔阈值（小时）</label>
+              <input id="topicGapHours" type="number" min="1" max="24" value="4" />
+            </div>
+          </div>
+        </details>
+        <div class="row" style="margin-top:10px; align-items:center;">
+          <label class="muted"><input id="withFrontmatter" type="checkbox" checked /> 写入 frontmatter</label>
+          <label class="muted"><input id="withFrontmatterIndexId" type="checkbox" /> 预填首主题 index_id（可后续修改）</label>
+        </div>
+        <div class="help-note">frontmatter 是写在 md 顶部的元数据草稿。最终版本建议按你的检索习惯，手动补写更稳定的关键词/标签，不必照搬自动主题词。</div>
+        <div class="field" style="margin-top:10px;">
+          <label>跨窗口检索</label>
+          <div class="row search-row">
+            <input id="searchInput" type="search" placeholder="输入关键词，例如：记忆架构 / 七大姑 / 审稿" />
+            <select id="searchScope">
+              <option value="selected">已勾选窗口</option>
+              <option value="month">当月全部窗口</option>
+              <option value="all">全部已加载窗口</option>
+            </select>
+            <button class="btn secondary" id="searchBtn">检索</button>
+            <button class="btn ghost" id="clearSearchBtn">清除</button>
+          </div>
+          <div class="muted" id="searchStatus"></div>
+        </div>
+      </div>
+      <div class="preview" id="previewPane">等待加载</div>
+    </section>
+  </main>
+  <main id="pageReview" class="page review-main">
+    <section class="panel review-panel">
+      <h2>Topic 标记原文</h2>
+      <div class="field">
+        <label>导入按天 MD（干净正文或含注释均可）</label>
+        <input id="reviewMdFile" type="file" accept=".md,text/markdown,text/plain" />
+      </div>
+      <div class="field">
+        <label>导入主题候选索引 CSV（可选）</label>
+        <input id="reviewCsvFile" type="file" accept=".csv,text/csv" />
+      </div>
+      <div class="field">
+        <label>导入 sidecar 注释 JSON（可选）</label>
+        <input id="reviewSidecarFile" type="file" accept=".json,application/json,text/plain" />
+        <div class="help-note">sidecar 是你的“人工批注备份”。导入后会自动恢复你上次改过的标题、标签、index_id、保留状态。</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="loadReviewBtn">载入审阅</button>
+        <button class="btn secondary" id="resetReviewBtn">重置</button>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <input id="manualTopicAnchor" type="text" placeholder="手动新增：输入 msg 锚点，如 msg-000128（可选）" style="flex:1; min-width:260px;" />
+        <input id="manualTopicTitle" type="text" placeholder="手动主题标题（可选）" style="flex:1; min-width:220px;" />
+        <button class="btn secondary" id="addManualTopicBtn">新增topic</button>
+      </div>
+      <div class="muted" id="reviewStatus" style="margin-top:8px;"></div>
+      <div class="preview review-pre" id="reviewMdPreview" style="margin-top:10px;">等待加载 topic 标记原文</div>
+    </section>
+    <section class="panel review-panel">
+      <h2>主题候选批注列表</h2>
+      <div class="help-note" style="margin-bottom:8px;">
+        提示：先在左侧预览里点某条 <code>^msg-xxxxxx</code> 锚点，会自动填到“手动新增”定位框。自动标题只是草稿，建议改成“关键词+场景”（如“审稿回复情绪管理”）。
+      </div>
+      <div class="topic-list" id="topicList">等待加载</div>
+      <div class="row">
+        <button class="btn secondary" id="keepAllTopicsBtn">全保留</button>
+        <button class="btn ghost" id="dropAllTopicsBtn">全删除</button>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn" id="exportReviewedMdBtn">导出修订MD</button>
+        <button class="btn secondary" id="exportReviewedCsvBtn">导出修订CSV</button>
+        <button class="btn ghost" id="exportSidecarBtn">导出sidecar</button>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <label class="muted"><input id="reviewExportDebug" type="checkbox" /> 修订MD保留调试注释</label>
+      </div>
+    </section>
+  </main>
+  <footer>
+    PawTrail 说明：大文件解析会稍慢，建议先按月份筛选，再分批导出与审阅。
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script>
+    let allConversations = [];
+    let monthIndex = {};
+    let selectedMonth = null;
+    let selectedConvIds = new Set();
+    const SEARCH_MAX_WINDOWS = 200;
+    const SEARCH_MAX_MESSAGES = 1200;
+    let searchState = {
+      keyword: '',
+      scope: 'selected',
+      results: [],
+      total: 0,
+      truncated: false
+    };
+    let reviewState = {
+      mdName: '',
+      mdLines: [],
+      topics: [],
+      csvHeaders: [],
+      csvRows: [],
+      renderedLines: [],
+      topicOutputLineMap: new Map(),
+      focusedLine: -1,
+      uidSeed: 1,
+      sidecarMeta: {}
+    };
+
+    function normalizeTimestamp(ts) {
+      if (!ts) return 0;
+      return ts > 1e12 ? Math.floor(ts / 1000) : ts;
+    }
+
+    function normalizeMessage(msg) {
+      const role = (msg && msg.author && msg.author.role) || (msg && msg.role) || 'assistant';
+      let content = '';
+      if (msg && msg.content && msg.content.parts) content = msg.content.parts.join('\n');
+      else if (msg && typeof msg.content === 'string') content = msg.content;
+      else if (msg && msg.content && msg.content.text) content = msg.content.text;
+      const ts = msg && msg.create_time ? msg.create_time : (msg && msg.metadata && (msg.metadata.timestamp || msg.metadata.timestamp_)) || 0;
+      const trimmed = content ? content.trim() : '';
+      return { role, content: trimmed, ts: normalizeTimestamp(ts) };
+    }
+
+    function getNodeMessageTimestamp(node) {
+      if (!node || !node.message) return 0;
+      const msg = node.message;
+      const rawTs = msg.create_time ? msg.create_time : (msg.metadata && (msg.metadata.timestamp || msg.metadata.timestamp_)) || 0;
+      return normalizeTimestamp(rawTs);
+    }
+
+    function getLatestSubtreeTimestamp(nodeId, mapping, cache, stack) {
+      if (!nodeId || !mapping[nodeId]) return 0;
+      if (cache[nodeId] !== undefined) return cache[nodeId];
+      if (stack.has(nodeId)) return getNodeMessageTimestamp(mapping[nodeId]);
+      stack.add(nodeId);
+      const node = mapping[nodeId];
+      let bestTs = getNodeMessageTimestamp(node);
+      const children = (node && node.children) ? node.children : [];
+      for (let i = 0; i < children.length; i += 1) {
+        const childId = children[i];
+        const childTs = getLatestSubtreeTimestamp(childId, mapping, cache, stack);
+        if (childTs > bestTs) bestTs = childTs;
+      }
+      stack.delete(nodeId);
+      cache[nodeId] = bestTs;
+      return bestTs;
+    }
+
+    function linearizeConversation(conv) {
+      if (!conv || !conv.mapping) return [];
+      const mapping = conv.mapping;
+
+      function collectPathFromCurrentNode() {
+        if (!conv.current_node || !mapping[conv.current_node]) return [];
+        const ids = [];
+        const seen = new Set();
+        let nodeId = conv.current_node;
+        while (nodeId && !seen.has(nodeId) && mapping[nodeId]) {
+          seen.add(nodeId);
+          ids.push(nodeId);
+          nodeId = mapping[nodeId].parent;
+        }
+        ids.reverse();
+        return ids;
+      }
+
+      function collectLatestBranchPath() {
+        const ids = [];
+        const allIds = Object.keys(mapping);
+        if (!allIds.length) return ids;
+        const rootId = allIds.find(id => {
+          const parentId = mapping[id] && mapping[id].parent;
+          return parentId === null || !mapping[parentId];
+        }) || allIds[0];
+        const visited = new Set();
+        const cache = {};
+        const stack = new Set();
+        let nodeId = rootId;
+
+        while (nodeId && !visited.has(nodeId) && mapping[nodeId]) {
+          visited.add(nodeId);
+          ids.push(nodeId);
+          const node = mapping[nodeId];
+          const children = (node && node.children) ? node.children : [];
+          if (!children.length) break;
+
+          let nextId = null;
+          let bestTs = -1;
+          for (let i = 0; i < children.length; i += 1) {
+            const childId = children[i];
+            if (!mapping[childId]) continue;
+            const childTs = getLatestSubtreeTimestamp(childId, mapping, cache, stack);
+            if (nextId === null || childTs > bestTs) {
+              nextId = childId;
+              bestTs = childTs;
+            }
+          }
+          if (!nextId) break;
+          nodeId = nextId;
+        }
+        return ids;
+      }
+
+      function pathToMessages(pathIds) {
+        const out = [];
+        for (let i = 0; i < pathIds.length; i += 1) {
+          const node = mapping[pathIds[i]];
+          if (!node || !node.message) continue;
+          const m = normalizeMessage(node.message);
+          if (m.content) out.push(m);
+        }
+        return out;
+      }
+
+      const primaryMsgs = pathToMessages(collectPathFromCurrentNode());
+      const fallbackMsgs = pathToMessages(collectLatestBranchPath());
+      if (!primaryMsgs.length) return fallbackMsgs;
+      if (primaryMsgs.length < fallbackMsgs.length) return fallbackMsgs;
+      return primaryMsgs;
+    }
+
+    function parseOpenAIJson(json) {
+      let conversations = [];
+      if (Array.isArray(json)) conversations = json;
+      else if (json && json.conversations && Array.isArray(json.conversations)) conversations = json.conversations;
+      else if (json && json.mapping) conversations = [json];
+      const all = [];
+      conversations.forEach((c, i) => {
+        const messages = c.mapping ? linearizeConversation(c) : ((c.messages || []).map(normalizeMessage));
+        if (messages.length) {
+          all.push({ id: c.id || `conv-${i}`, title: c.title || 'Conversation', messages });
+        }
+      });
+      return all;
+    }
+
+    function monthKey(ts) {
+      if (!ts) return 'unknown';
+      const d = new Date(normalizeTimestamp(ts) * 1000);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      return `${y}-${m}`;
+    }
+
+    function formatDate(ts) {
+      if (!ts) return '未知';
+      const d = new Date(normalizeTimestamp(ts) * 1000);
+      return d.toISOString().slice(0, 10);
+    }
+
+    function formatDateTime(ts) {
+      if (!ts) return '未知';
+      const d = new Date(normalizeTimestamp(ts) * 1000);
+      return d.toISOString().replace('T', ' ').slice(0, 19);
+    }
+
+    function getConversationRange(conv) {
+      const tsList = conv.messages.filter(m => m.content).map(m => normalizeTimestamp(m.ts)).filter(Boolean);
+      if (!tsList.length) return { start: null, end: null };
+      return { start: Math.min(...tsList), end: Math.max(...tsList) };
+    }
+
+    function buildMonthIndex(convs) {
+      const idx = {};
+      convs.forEach(conv => {
+        const range = getConversationRange(conv);
+        const key = monthKey(range.start || range.end || 0);
+        if (!idx[key]) idx[key] = [];
+        idx[key].push({ ...conv, range, count: conv.messages.filter(m => m.content).length });
+      });
+      return idx;
+    }
+
+    function renderMonths() {
+      const list = document.getElementById('monthList');
+      list.innerHTML = '';
+      const keys = Object.keys(monthIndex).sort();
+      if (!keys.length) {
+        list.textContent = '未加载';
+        return;
+      }
+      keys.forEach(k => {
+        const item = document.createElement('div');
+        item.className = 'item' + (k === selectedMonth ? ' active' : '');
+        const total = monthIndex[k].reduce((sum, c) => sum + c.count, 0);
+        item.innerHTML = `<div><strong>${k}</strong> <span class="meta">(${monthIndex[k].length} 窗口 / ${total} 条)</span></div>`;
+        item.onclick = () => {
+          selectedMonth = k;
+          renderMonths();
+          renderWindows();
+          if (searchState.keyword) runSearch(true);
+          else renderPreview();
+        };
+        list.appendChild(item);
+      });
+    }
+
+    function renderWindows() {
+      const list = document.getElementById('windowList');
+      list.innerHTML = '';
+      if (!selectedMonth || !monthIndex[selectedMonth]) {
+        list.textContent = '请选择月份';
+        return;
+      }
+      const minCount = parseInt(document.getElementById('minCount').value || '0', 10);
+      const windows = monthIndex[selectedMonth].filter(c => c.count >= minCount);
+      if (!windows.length) {
+        list.textContent = '该月份无窗口或被过滤';
+        return;
+      }
+      windows.forEach(conv => {
+        const row = document.createElement('div');
+        row.className = 'item';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = selectedConvIds.has(conv.id);
+        checkbox.onchange = () => {
+          if (checkbox.checked) selectedConvIds.add(conv.id);
+          else selectedConvIds.delete(conv.id);
+          if (searchState.keyword) runSearch(true);
+          else renderPreview();
+        };
+        const info = document.createElement('div');
+        info.innerHTML = `<div class="window-title">${conv.title}</div><div class="meta">${formatDate(conv.range.start)} ~ ${formatDate(conv.range.end)} · ${conv.count} 条</div>`;
+        row.appendChild(checkbox);
+        row.appendChild(info);
+        list.appendChild(row);
+      });
+    }
+
+    function setSearchStatus(text) {
+      document.getElementById('searchStatus').textContent = text || '';
+    }
+
+    function getWindowsForSearchScope(scope, minCount) {
+      const monthWindows = selectedMonth ? (monthIndex[selectedMonth] || []) : [];
+      if (scope === 'selected') {
+        return monthWindows.filter(c => c.count >= minCount && selectedConvIds.has(c.id));
+      }
+      if (scope === 'month') {
+        return monthWindows.filter(c => c.count >= minCount);
+      }
+      const byId = new Map();
+      Object.keys(monthIndex).forEach(k => {
+        monthIndex[k].forEach(c => {
+          if (c.count >= minCount && !byId.has(c.id)) byId.set(c.id, c);
+        });
+      });
+      return Array.from(byId.values());
+    }
+
+    function appendHighlightedText(container, text, keyword) {
+      if (!keyword) {
+        container.textContent = text;
+        return;
+      }
+      const lowerText = text.toLowerCase();
+      const lowerNeedle = keyword.toLowerCase();
+      let offset = 0;
+      while (offset < text.length) {
+        const hit = lowerText.indexOf(lowerNeedle, offset);
+        if (hit === -1) {
+          container.appendChild(document.createTextNode(text.slice(offset)));
+          break;
+        }
+        if (hit > offset) {
+          container.appendChild(document.createTextNode(text.slice(offset, hit)));
+        }
+        const mark = document.createElement('mark');
+        mark.textContent = text.slice(hit, hit + keyword.length);
+        container.appendChild(mark);
+        offset = hit + keyword.length;
+      }
+    }
+
+    function createMessageRow(message, keyword) {
+      const role = message.role === 'user' ? 'user' : 'assistant';
+      const row = document.createElement('div');
+      row.className = 'msg-row ' + role;
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble ' + role;
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = `[${formatDateTime(message.ts)}] ${role === 'user' ? 'user' : 'char'}`;
+
+      const text = document.createElement('div');
+      appendHighlightedText(text, message.content, keyword);
+
+      bubble.appendChild(meta);
+      bubble.appendChild(text);
+      row.appendChild(bubble);
+      return row;
+    }
+
+    function runSearch(updatePreview) {
+      const keyword = (document.getElementById('searchInput').value || '').trim();
+      const scope = document.getElementById('searchScope').value || 'selected';
+      searchState.scope = scope;
+
+      if (!keyword) {
+        searchState = { keyword: '', scope, results: [], total: 0, truncated: false };
+        setSearchStatus('');
+        if (updatePreview) renderPreview();
+        return;
+      }
+
+      const minCount = parseInt(document.getElementById('minCount').value || '0', 10);
+      const windows = getWindowsForSearchScope(scope, minCount);
+      if ((scope === 'selected' || scope === 'month') && !selectedMonth) {
+        searchState = { keyword, scope, results: [], total: 0, truncated: false };
+        setSearchStatus('请先选择月份，再进行跨窗口检索。');
+        if (updatePreview) renderPreview();
+        return;
+      }
+      if (!windows.length) {
+        searchState = { keyword, scope, results: [], total: 0, truncated: false };
+        setSearchStatus('当前范围没有可检索的窗口。');
+        if (updatePreview) renderPreview();
+        return;
+      }
+
+      const needle = keyword.toLowerCase();
+      const results = [];
+      let total = 0;
+      let captured = 0;
+      let truncated = false;
+
+      for (let i = 0; i < windows.length; i += 1) {
+        const conv = windows[i];
+        const hits = [];
+        for (let j = 0; j < conv.messages.length; j += 1) {
+          const message = conv.messages[j];
+          if (!message || !message.content) continue;
+          if (message.content.toLowerCase().includes(needle)) {
+            total += 1;
+            if (captured < SEARCH_MAX_MESSAGES) {
+              hits.push(message);
+              captured += 1;
+            } else {
+              truncated = true;
+            }
+          }
+        }
+        if (hits.length) {
+          if (results.length < SEARCH_MAX_WINDOWS) {
+            results.push({ conv, hits });
+          } else {
+            truncated = true;
+          }
+        }
+        if (captured >= SEARCH_MAX_MESSAGES && results.length >= SEARCH_MAX_WINDOWS) {
+          break;
+        }
+      }
+
+      searchState = { keyword, scope, results, total, truncated };
+      if (!results.length) {
+        setSearchStatus(`未命中关键词：${keyword}`);
+      } else {
+        const clipped = truncated ? '（结果已截断，建议缩小范围）' : '';
+        setSearchStatus(`命中 ${total} 条消息，分布在 ${results.length} 个窗口 ${clipped}`);
+      }
+      if (updatePreview) renderPreview();
+    }
+
+    function renderSearchPreview() {
+      const pane = document.getElementById('previewPane');
+      pane.innerHTML = '';
+      if (!searchState.results.length) {
+        pane.textContent = '暂无检索结果';
+        return;
+      }
+      searchState.results.forEach(item => {
+        const windowCard = document.createElement('div');
+        windowCard.className = 'chat-window';
+
+        const head = document.createElement('div');
+        head.className = 'chat-window-head';
+        head.textContent = `[检索] ${item.conv.title} · ${formatDate(item.conv.range.start)} ~ ${formatDate(item.conv.range.end)} · 命中 ${item.hits.length} 条`;
+        windowCard.appendChild(head);
+
+        const body = document.createElement('div');
+        body.className = 'chat-window-body';
+        item.hits.forEach(message => {
+          body.appendChild(createMessageRow(message, searchState.keyword));
+        });
+        windowCard.appendChild(body);
+        pane.appendChild(windowCard);
+      });
+    }
+
+    function renderPreview() {
+      const pane = document.getElementById('previewPane');
+      pane.innerHTML = '';
+
+      if (searchState.keyword) {
+        renderSearchPreview();
+        return;
+      }
+
+      if (!selectedMonth) {
+        pane.textContent = '请选择月份';
+        return;
+      }
+      const chosen = (monthIndex[selectedMonth] || []).filter(c => selectedConvIds.has(c.id));
+      if (!chosen.length) {
+        pane.textContent = '请勾选窗口进行预览';
+        return;
+      }
+      chosen.forEach(conv => {
+        const windowCard = document.createElement('div');
+        windowCard.className = 'chat-window';
+
+        const head = document.createElement('div');
+        head.className = 'chat-window-head';
+        head.textContent = `${conv.title} · ${formatDate(conv.range.start)} ~ ${formatDate(conv.range.end)} · ${conv.count} 条`;
+        windowCard.appendChild(head);
+
+        const body = document.createElement('div');
+        body.className = 'chat-window-body';
+        conv.messages.filter(m => m.content).forEach(m => {
+          body.appendChild(createMessageRow(m, ''));
+        });
+        windowCard.appendChild(body);
+        pane.appendChild(windowCard);
+      });
+    }
+
+    function buildMarkdown(convs, month, includeAnchors) {
+      const lines = [];
+      let msgIndex = 0;
+      lines.push(`# ${month} PawTrail Archive`);
+      convs.forEach(conv => {
+        lines.push('');
+        lines.push(`## ${conv.title}`);
+        lines.push(`范围: ${formatDate(conv.range.start)} ~ ${formatDate(conv.range.end)} | 消息数: ${conv.count}`);
+        conv.messages.filter(m => m.content).forEach(m => {
+          msgIndex += 1;
+          lines.push('');
+          lines.push(`[${formatDateTime(m.ts)}] ${m.role}:`);
+          lines.push(m.content);
+          if (includeAnchors) lines.push(`^msg-${String(msgIndex).padStart(6, '0')}`);
+        });
+      });
+      return lines.join('\n');
+    }
+
+    function safeFileName(raw) {
+      return (raw || 'untitled')
+        .replace(/[\\/:*?"<>|]/g, '_')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80) || 'untitled';
+    }
+
+    function escapeCsvCell(v) {
+      const s = String(v == null ? '' : v);
+      if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    }
+
+    function toCsv(rows, headers) {
+      const head = headers.join(',');
+      const body = rows.map(r => headers.map(h => escapeCsvCell(r[h])).join(','));
+      return [head].concat(body).join('\n');
+    }
+
+    function getSelectedConversations() {
+      const all = getAllConversations();
+      const chosen = all.filter(c => selectedConvIds.has(c.id));
+      if (!chosen.length) return { error: '请先勾选窗口再导出（可跨月份）' };
+      return { chosen };
+    }
+
+    function getAllConversations() {
+      const byId = new Map();
+      Object.keys(monthIndex).forEach(k => {
+        (monthIndex[k] || []).forEach(c => {
+          if (!byId.has(c.id)) byId.set(c.id, c);
+        });
+      });
+      return Array.from(byId.values());
+    }
+
+    function getExportScopeLabel(chosen) {
+      if (!chosen || !chosen.length) return (selectedMonth || 'multi-month');
+      const months = Array.from(new Set(chosen.map(c => monthKey((c.range && (c.range.start || c.range.end)) || 0)))).sort();
+      if (!months.length) return (selectedMonth || 'multi-month');
+      if (months.length === 1) return months[0];
+      return `${months[0]}_to_${months[months.length - 1]}`;
+    }
+
+    function buildWindowTopicSegments(rows, conv, opts = {}) {
+      if (!rows.length) return [];
+      const topicGapHours = Math.max(1, Math.min(24, Number(opts.topicGapHours || 4)));
+      const transitionRe = /^(对了|另外|话说回来|回到刚才|顺便|btw|by the way|on another note)/i;
+      const boundaries = [{ start: 0, reason: 'day_start', confidence: '0.65' }];
+      for (let i = 1; i < rows.length; i += 1) {
+        const cur = rows[i];
+        const prev = rows[i - 1];
+        const gapHours = (normalizeTimestamp(cur.ts) - normalizeTimestamp(prev.ts)) / 3600;
+        const reasons = [];
+        if (gapHours >= topicGapHours) reasons.push(`gap_${gapHours.toFixed(1)}h`);
+        if (transitionRe.test((cur.content || '').trim())) reasons.push('transition_word');
+        if (!reasons.length) continue;
+        const confidence = reasons.includes('transition_word') && reasons.some(r => r.startsWith('gap_'))
+          ? 0.85
+          : (reasons.some(r => r.startsWith('gap_')) ? 0.75 : 0.6);
+        boundaries.push({
+          start: i,
+          reason: reasons.join('+'),
+          confidence: confidence.toFixed(2)
+        });
+      }
+      const convShort = safeFileName(String(conv.id || 'conv')).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 12) || 'conv';
+      const segments = [];
+      for (let b = 0; b < boundaries.length; b += 1) {
+        const cur = boundaries[b];
+        const nextStart = b + 1 < boundaries.length ? boundaries[b + 1].start : rows.length;
+        const endIdx = Math.max(cur.start, nextStart - 1);
+        const first = rows[cur.start];
+        const topicSeq = b + 1;
+        const dayKey = formatDate(first.ts).replace(/-/g, '') || 'na';
+        const topicTitle = buildAutoTopicTitle(first.content, topicSeq, cur.reason);
+        const topicSeed = buildTopicSeed(first.content);
+        const tag = buildAutoTopicTags(topicTitle, cur.reason);
+        const anchorCandidates = getMsgAnchors(opts, {
+          scope: opts.sessionId || '',
+          convId: conv.id || '',
+          convTitle: conv.title || '',
+          day: formatDate(first.ts),
+          msgLocal: cur.start + 1,
+          msgGlobal: cur.start + 1
+        });
+        segments.push({
+          index_id: String(topicSeq).padStart(3, '0'),
+          start_idx: cur.start,
+          end_idx: endIdx,
+          topic_id: `${dayKey}-${convShort}-W${String(topicSeq).padStart(3, '0')}`,
+          topic_title: topicTitle,
+          tags: tag,
+          reason: cur.reason,
+          reason_human: explainTopicReason(cur.reason),
+          confidence: cur.confidence,
+          topic_note: topicSeed ? `自动标记（候选关键词：${topicSeed}）` : '自动标记（建议改成可检索关键词）',
+          start_ts: formatDateTime(rows[cur.start].ts),
+          end_ts: formatDateTime(rows[endIdx].ts),
+          anchor_msg_id: anchorCandidates[0] || `msg-${String(cur.start + 1).padStart(6, '0')}`
+        });
+      }
+      return segments;
+    }
+
+    function buildWindowMarkdown(conv, includeAnchors, opts = {}) {
+      const lines = [];
+      const rows = conv.messages.filter(m => m.content);
+      const withTopicMarkers = !!opts.withTopicMarkers;
+      const withTopicSections = !!opts.withTopicSections;
+      const withFrontmatter = !!opts.withFrontmatter;
+      const withFrontmatterIndexId = !!opts.withFrontmatterIndexId;
+      const segments = withTopicSections ? buildWindowTopicSegments(rows, conv, opts) : [];
+
+      if (withFrontmatter) {
+        const startDate = conv.range && conv.range.start ? formatDate(conv.range.start) : '';
+        const endDate = conv.range && conv.range.end ? formatDate(conv.range.end) : '';
+        lines.push('---');
+        if (startDate && endDate && startDate !== endDate) lines.push(`date_range: "${startDate}~${endDate}"`);
+        else if (startDate) lines.push(`date: ${startDate}`);
+        lines.push('source: "pawtrail-archive"');
+        if (opts.sessionId) lines.push(`session_id: "${escapeMarkerValue(opts.sessionId)}"`);
+        lines.push(`thread_id: "${escapeMarkerValue(String(conv.id || ''))}"`);
+        if (withFrontmatterIndexId && segments.length) {
+          lines.push(`index_id: "${escapeMarkerValue(segments[0].index_id || segments[0].topic_id || '')}"`);
+          lines.push(`topic: "${escapeMarkerValue(segments[0].topic_title || '')}"`);
+        }
+        lines.push('---');
+        lines.push('');
+      }
+
+      lines.push(`# ${conv.title}`);
+      lines.push(`范围: ${formatDate(conv.range.start)} ~ ${formatDate(conv.range.end)} | 消息数: ${conv.count}`);
+
+      let msgIndex = 0;
+      let segCursor = 0;
+      rows.forEach((m, idx) => {
+        const seg = segments[segCursor];
+        if (seg && idx === seg.start_idx) {
+          lines.push('');
+          lines.push(`### ${makeWikiLink(seg.topic_title || `窗口主题${segCursor + 1}`)}`);
+          lines.push(seg.tags || '#topic/待命名');
+          if (withTopicMarkers) {
+            lines.push(formatTopicMarkerLine({
+              topic_id: seg.topic_id,
+              reason: seg.reason,
+              confidence: seg.confidence,
+              topic_title: seg.topic_title,
+              topic_note: seg.topic_note,
+              tags: seg.tags,
+              index_id: '',
+              start_ts: seg.start_ts,
+              end_ts: seg.end_ts,
+              anchor_msg_id: seg.anchor_msg_id,
+              session_id: opts.sessionId || '',
+              obsidian_file: opts.obsidianFile || ''
+            }));
+          }
+          lines.push('');
+          segCursor += 1;
+        }
+
+        msgIndex += 1;
+        lines.push('');
+        lines.push(`[${formatDateTime(m.ts)}] ${m.role === 'user' ? 'user' : 'char'}:`);
+        lines.push(m.content);
+        if (includeAnchors) {
+          const anchors = getMsgAnchors(opts, {
+            scope: opts.sessionId || '',
+            convId: conv.id || '',
+            convTitle: conv.title || '',
+            day: formatDate(m.ts),
+            msgLocal: msgIndex,
+            msgGlobal: msgIndex
+          });
+          anchors.forEach(a => lines.push(`^${a}`));
+        }
+      });
+      return { markdown: lines.join('\n'), segments };
+    }
+
+    function explainTopicReason(reasonCode) {
+      if (!reasonCode) return '无';
+      const parts = reasonCode.split('+').map(s => s.trim()).filter(Boolean);
+      const out = [];
+      parts.forEach(p => {
+        if (p.startsWith('gap_')) {
+          out.push(`与上一段间隔 ${p.replace('gap_', '')}`);
+        } else if (p === 'transition_word') {
+          out.push('命中转场词');
+        } else if (p === 'day_start') {
+          out.push('当天起始段');
+        } else if (p === 'manual') {
+          out.push('手动标注');
+        } else {
+          out.push(p);
+        }
+      });
+      return out.join(' + ');
+    }
+
+    function normalizeTopicTag(title) {
+      const base = String(title || 'topic').trim().toLowerCase();
+      const s = base
+        .replace(/[^\p{L}\p{N}_-]+/gu, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      return s || 'topic';
+    }
+
+    function buildTopicSeed(text) {
+      const raw = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!raw) return '';
+      const clause = raw.split(/[。！？!?；;，,\n]/)[0].trim();
+      let s = clause
+        .replace(/^(我觉得|我想|我在想|然后|另外|就是|那个|所以|阿霁|阿鸢|宝宝|嗯+|啊+|欸+)/, '')
+        .replace(/[“”"'`]/g, '')
+        .trim();
+      if (!s) s = clause;
+      return s.slice(0, 16).trim();
+    }
+
+    function buildAutoTopicTitle(firstContent, topicSeq, reasonCode) {
+      if (String(reasonCode || '').includes('transition_word')) return `转场主题 ${topicSeq}`;
+      if (String(reasonCode || '').includes('gap_')) return `间隔主题 ${topicSeq}`;
+      if (String(reasonCode || '') === 'day_start') return `开场主题 ${topicSeq}`;
+      return `待命名主题 ${topicSeq}`;
+    }
+
+    function buildAutoTopicTags(title, reasonCode) {
+      const tags = ['#topic/待命名'];
+      if (String(reasonCode || '').includes('transition_word')) tags.push('#topic/转场');
+      else if (String(reasonCode || '').includes('gap_')) tags.push('#topic/间隔');
+      else if (String(reasonCode || '') === 'day_start') tags.push('#topic/开场');
+      const normalized = normalizeTopicTag(title);
+      if (normalized && normalized !== 'topic') tags.push(`#topic/${normalized}`);
+      return Array.from(new Set(tags)).join(' ');
+    }
+
+    function safeAnchorSegment(raw) {
+      const s = String(raw || '')
+        .trim()
+        .replace(/[^\p{L}\p{N}_-]+/gu, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      return s || 'na';
+    }
+
+    function renderCustomMsgAnchor(template, ctx) {
+      const token = {
+        scope: safeAnchorSegment(ctx.scope || 'session'),
+        conv: safeAnchorSegment(ctx.convId || 'conv'),
+        window: safeAnchorSegment(ctx.convTitle || 'window'),
+        day: safeAnchorSegment(ctx.day || 'day'),
+        msg: String(Math.max(1, Number(ctx.msgLocal || 1))).padStart(6, '0'),
+        g: String(Math.max(1, Number(ctx.msgGlobal || ctx.msgLocal || 1))).padStart(6, '0')
+      };
+      let out = String(template || 'm-{scope}-{conv}-{msg}');
+      Object.keys(token).forEach(k => {
+        out = out.replace(new RegExp(`\\{${k}\\}`, 'g'), token[k]);
+      });
+      out = safeAnchorSegment(out);
+      if (!out || out === 'na') {
+        out = `m-${token.scope}-${token.conv}-${token.msg}`;
+      }
+      return out;
+    }
+
+    function getMsgAnchors(opts, ctx) {
+      const mode = String(opts.msgAnchorStyle || 'custom');
+      const classic = `msg-${String(Math.max(1, Number(ctx.msgLocal || 1))).padStart(6, '0')}`;
+      const custom = renderCustomMsgAnchor(opts.msgAnchorTemplate, ctx);
+      const out = [];
+      if (mode === 'custom') {
+        out.push(custom);
+      } else if (mode === 'dual') {
+        out.push(classic);
+        if (custom !== classic) out.push(custom);
+      } else {
+        out.push(classic);
+      }
+      return Array.from(new Set(out.filter(Boolean)));
+    }
+
+    function makeWikiLink(title) {
+      const clean = String(title || '未命名主题').replace(/\]\]/g, '').trim() || '未命名主题';
+      return `[[${clean}]]`;
+    }
+
+    function escapeMarkerValue(v) {
+      return String(v || '').replace(/"/g, '\'');
+    }
+
+    function formatTopicMarkerLine(meta) {
+      const attrs = [
+        `reason=${meta.reason || 'manual'}`,
+        `confidence=${String(meta.confidence || '')}`,
+        `title="${escapeMarkerValue(meta.topic_title || '')}"`,
+        `note="${escapeMarkerValue(meta.topic_note || meta.note || '')}"`,
+        `tags="${escapeMarkerValue(meta.tags || '')}"`,
+        `index_id="${escapeMarkerValue(meta.index_id || '')}"`,
+        `start_ts="${escapeMarkerValue(meta.start_ts || '')}"`,
+        `end_ts="${escapeMarkerValue(meta.end_ts || '')}"`,
+        `anchor_msg_id="${escapeMarkerValue(meta.anchor_msg_id || '')}"`,
+        `session_id="${escapeMarkerValue(meta.session_id || '')}"`,
+        `obsidian_file="${escapeMarkerValue(meta.obsidian_file || '')}"`
+      ];
+      return `<!-- TOPIC_CANDIDATE ${meta.topic_id} ${attrs.join(' ')} -->`;
+    }
+
+    function buildDayExport(chosen, opts) {
+      const dayMap = new Map();
+      chosen.forEach(conv => {
+        conv.messages.filter(m => m.content).forEach((m, i) => {
+          const ts = normalizeTimestamp(m.ts);
+          const day = formatDate(ts);
+          if (!dayMap.has(day)) dayMap.set(day, []);
+          dayMap.get(day).push({
+            ts,
+            role: m.role === 'user' ? 'user' : 'char',
+            content: m.content,
+            convTitle: conv.title,
+            convId: conv.id,
+            sourceIndex: i + 1
+          });
+        });
+      });
+
+      const transitionRe = /^(对了|另外|话说回来|回到刚才|顺便|btw|by the way|on another note)/i;
+      const days = Array.from(dayMap.keys()).sort();
+      const files = [];
+      const topicRows = [];
+      const indexRows = [];
+      const dayStart = days[0] || '';
+      const dayEnd = days[days.length - 1] || '';
+      const sessionId = opts.sessionId || selectedMonth || `${dayStart || 'session'}_${dayEnd || 'session'}`;
+      const indexNoteName = `${safeFileName(opts.exportBase || 'archive')}_toc_${dayStart || 'na'}_to_${dayEnd || 'na'}`;
+      let globalIndexSeq = 1;
+      const withTopicSections = !!opts.withTopicSections;
+      const withObsidianIndex = !!opts.withObsidianLinks && withTopicSections;
+
+      days.forEach(day => {
+        const rows = dayMap.get(day).sort((a, b) => a.ts - b.ts);
+        if (!rows.length) return;
+
+        const segments = [];
+        if (withTopicSections) {
+          const boundaries = [];
+          boundaries.push({ start: 0, reason: 'day_start', confidence: '0.65' });
+          for (let i = 1; i < rows.length; i += 1) {
+            const cur = rows[i];
+            const prev = rows[i - 1];
+            const gapHours = (cur.ts - prev.ts) / 3600;
+            const reasons = [];
+            if (gapHours >= opts.topicGapHours) reasons.push(`gap_${gapHours.toFixed(1)}h`);
+            if (transitionRe.test(cur.content.trim())) reasons.push('transition_word');
+            if (!reasons.length) continue;
+            const confidence = reasons.includes('transition_word') && reasons.some(r => r.startsWith('gap_'))
+              ? 0.85
+              : (reasons.some(r => r.startsWith('gap_')) ? 0.75 : 0.6);
+            boundaries.push({
+              start: i,
+              reason: reasons.join('+'),
+              confidence: confidence.toFixed(2)
+            });
+          }
+
+          for (let b = 0; b < boundaries.length; b += 1) {
+            const cur = boundaries[b];
+            const nextStart = b + 1 < boundaries.length ? boundaries[b + 1].start : rows.length;
+            const end = Math.max(cur.start, nextStart - 1);
+            const first = rows[cur.start];
+            const topicSeq = b + 1;
+            const topicId = `${day.replace(/-/g, '')}-T${String(topicSeq).padStart(3, '0')}`;
+            const topicTitle = buildAutoTopicTitle(first.content, topicSeq, cur.reason);
+            const topicSeed = buildTopicSeed(first.content);
+            const tag = buildAutoTopicTags(topicTitle, cur.reason);
+            const indexId = String(globalIndexSeq).padStart(5, '0');
+            globalIndexSeq += 1;
+            const anchorCandidates = getMsgAnchors(opts, {
+              scope: sessionId,
+              convId: first.convId || '',
+              convTitle: first.convTitle || '',
+              day,
+              msgLocal: cur.start + 1,
+              msgGlobal: cur.start + 1
+            });
+            const anchorMsg = anchorCandidates[0] || `msg-${String(cur.start + 1).padStart(6, '0')}`;
+            segments.push({
+              topic_id: topicId,
+              index_id: indexId,
+              topic_title: topicTitle,
+              tags: tag,
+              wikilinks: makeWikiLink(topicTitle),
+              reason: cur.reason,
+              reason_human: explainTopicReason(cur.reason),
+              confidence: cur.confidence,
+              topic_note: topicSeed
+                ? `自动标记（候选关键词：${topicSeed}）`
+                : '自动标记（建议改成可检索关键词）',
+              date: day,
+              start_ts: formatDateTime(rows[cur.start].ts),
+              end_ts: formatDateTime(rows[end].ts),
+              start_idx: cur.start,
+              end_idx: end,
+              window_title: first.convTitle,
+              window_id: first.convId,
+              anchor_msg_id: anchorMsg,
+              obsidian_file: `${day}.md`,
+              obsidian_anchor: `topic-${topicId}`,
+              session_id: sessionId,
+              thread_id: 'multi_window_day',
+              note: '',
+              summary: ''
+            });
+          }
+        }
+
+        const lines = [];
+        if (opts.withFrontmatter) {
+          lines.push('---');
+          lines.push(`date: ${day}`);
+          lines.push('source: "pawtrail-archive"');
+          lines.push(`session_id: "${sessionId}"`);
+          lines.push('thread_id: "multi_window_day"');
+          if (opts.withFrontmatterIndexId && segments.length) {
+            lines.push(`index_id: "${segments[0].index_id}"`);
+            lines.push(`topic: "${escapeMarkerValue(segments[0].topic_title)}"`);
+          }
+          lines.push('---');
+          lines.push('');
+        }
+
+        lines.push(`# ${day} PawTrail Archive`);
+        if (withObsidianIndex) lines.push(`上级索引: [[${indexNoteName}]]`);
+        if (withTopicSections) lines.push(`总消息数: ${rows.length} · 主题候选: ${segments.length}`);
+        else lines.push(`总消息数: ${rows.length}`);
+        lines.push('');
+
+        let msgSeq = 0;
+        let segCursor = 0;
+        for (let i = 0; i < rows.length; i += 1) {
+          const cur = rows[i];
+          const seg = segments[segCursor];
+          if (withTopicSections && seg && i === seg.start_idx) {
+            lines.push(`### ${seg.wikilinks}`);
+            lines.push(seg.tags);
+            if (opts.withTopicMarkers) lines.push(formatTopicMarkerLine(seg));
+            lines.push('');
+            segCursor += 1;
+          }
+
+          msgSeq += 1;
+          lines.push(`[${formatDateTime(cur.ts)}] ${cur.role} @ ${cur.convTitle}:`);
+          lines.push(cur.content);
+          if (opts.withAnchors) {
+            const anchors = getMsgAnchors(opts, {
+              scope: sessionId,
+              convId: cur.convId || '',
+              convTitle: cur.convTitle || '',
+              day,
+              msgLocal: msgSeq,
+              msgGlobal: msgSeq
+            });
+            anchors.forEach(a => lines.push(`^${a}`));
+          }
+          lines.push('');
+        }
+
+        files.push({
+          name: `by_day/${day}.md`,
+          content: lines.join('\n'),
+          type: 'text/markdown'
+        });
+        indexRows.push({ day, message_count: rows.length, topic_count: segments.length });
+        segments.forEach(s => {
+          topicRows.push({
+            index_id: s.index_id,
+            topic_id: s.topic_id,
+            topic_title: s.topic_title,
+            obsidian_file: `by_day/${s.obsidian_file}`,
+            obsidian_anchor: s.obsidian_anchor,
+            session_id: s.session_id,
+            thread_id: s.thread_id,
+            date: s.date,
+            start_ts: s.start_ts,
+            end_ts: s.end_ts,
+            tags: s.tags,
+            wikilinks: s.wikilinks,
+            note: s.note,
+            summary: s.summary,
+            reason: s.reason,
+            reason_human: s.reason_human,
+            confidence: s.confidence,
+            anchor_msg_id: s.anchor_msg_id,
+            topic_note: s.topic_note,
+            window_title: s.window_title,
+            window_id: s.window_id
+          });
+        });
+      });
+
+      if (opts.withTopicCsv && withTopicSections) {
+        files.push({
+          name: `topic_map_${dayStart || 'na'}_to_${dayEnd || 'na'}.csv`,
+          content: toCsv(topicRows, ['index_id', 'topic_id', 'topic_title', 'obsidian_file', 'obsidian_anchor', 'session_id', 'thread_id', 'date', 'start_ts', 'end_ts', 'tags', 'wikilinks', 'note', 'summary', 'reason', 'reason_human', 'confidence', 'anchor_msg_id', 'topic_note', 'window_title', 'window_id']),
+          type: 'text/csv'
+        });
+      }
+
+      if (withObsidianIndex) {
+        const idx = ['# PawTrail Archive Index', ''];
+        idx.push(`索引名: ${indexNoteName}`);
+        idx.push('');
+        indexRows.forEach(r => {
+          idx.push(`- [[by_day/${r.day}|${r.day}]] · ${r.message_count} 条 · topic候选 ${r.topic_count}`);
+        });
+        files.push({
+          name: `${indexNoteName}.md`,
+          content: idx.join('\n'),
+          type: 'text/markdown'
+        });
+      }
+
+      return files;
+    }
+
+    async function downloadZipEntries(entries, zipFileName) {
+      if (!entries.length) return false;
+      if (window.JSZip) {
+        const zip = new window.JSZip();
+        entries.forEach(entry => {
+          zip.file(entry.name, entry.content);
+        });
+        const blob = await zip.generateAsync({ type: 'blob' });
+        downloadBlob(blob, zipFileName);
+        return true;
+      }
+      entries.forEach(entry => {
+        const blob = new Blob([entry.content], { type: entry.type || 'text/plain' });
+        const filename = entry.name.split('/').pop() || entry.name;
+        downloadBlob(blob, filename);
+      });
+      return false;
+    }
+
+    function downloadBlob(blob, filename) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    function parseCsvText(text) {
+      const rows = [];
+      let i = 0;
+      let cur = '';
+      let row = [];
+      let inQuotes = false;
+
+      while (i < text.length) {
+        const ch = text[i];
+        if (inQuotes) {
+          if (ch === '"') {
+            if (text[i + 1] === '"') {
+              cur += '"';
+              i += 1;
+            } else {
+              inQuotes = false;
+            }
+          } else {
+            cur += ch;
+          }
+        } else if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === ',') {
+          row.push(cur);
+          cur = '';
+        } else if (ch === '\n') {
+          row.push(cur);
+          rows.push(row);
+          row = [];
+          cur = '';
+        } else if (ch !== '\r') {
+          cur += ch;
+        }
+        i += 1;
+      }
+      if (cur.length || row.length) {
+        row.push(cur);
+        rows.push(row);
+      }
+      if (!rows.length) return { headers: [], rows: [] };
+      const headers = rows[0].map(h => (h || '').trim());
+      const out = rows.slice(1).filter(r => r.length).map(r => {
+        const obj = {};
+        headers.forEach((h, idx) => {
+          obj[h] = r[idx] || '';
+        });
+        return obj;
+      });
+      return { headers, rows: out };
+    }
+
+    function parseMarkerAttrs(tail) {
+      const out = {};
+      const re = /([a-zA-Z0-9_]+)=("([^"]*)"|[^\s]+)/g;
+      let m;
+      while ((m = re.exec(tail)) !== null) {
+        out[m[1]] = m[3] !== undefined ? m[3] : m[2];
+      }
+      return out;
+    }
+
+    function nextTopicUid() {
+      const v = reviewState.uidSeed || 1;
+      reviewState.uidSeed = v + 1;
+      return v;
+    }
+
+    function sortTopicsInPlace() {
+      reviewState.topics.sort((a, b) => {
+        if (a.lineIndex !== b.lineIndex) return a.lineIndex - b.lineIndex;
+        return a.uid - b.uid;
+      });
+    }
+
+    function getDefaultTopicPrefix() {
+      const first = reviewState.topics.find(t => t.prefix);
+      if (first && first.prefix) return first.prefix;
+      const m = (reviewState.mdName || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (m) return `${m[1]}${m[2]}${m[3]}-T`;
+      return 'topic-T';
+    }
+
+    function parseTopicMarkersFromMd(mdText, csvRows, mdName) {
+      const mdLines = mdText.split('\n');
+      const mdBase = String(mdName || '').split(/[\\/]/).pop();
+      const mdDateMatch = mdBase.match(/(\d{4}-\d{2}-\d{2})/);
+      const mdDate = mdDateMatch ? mdDateMatch[1] : '';
+      const scopedCsvRows = (csvRows || []).filter(r => {
+        const obsidianFile = String(r.obsidian_file || '').split(/[\\/]/).pop();
+        if (obsidianFile && mdBase) return obsidianFile === mdBase;
+        if (!obsidianFile && mdDate && r.date) return String(r.date) === mdDate;
+        if (!mdBase && !mdDate) return true;
+        return false;
+      });
+      const csvById = new Map();
+      scopedCsvRows.forEach(r => {
+        if (r.topic_id) csvById.set(r.topic_id, r);
+      });
+      const topics = [];
+      const markerRe = /^\s*> \[TOPIC_CANDIDATE ([^\]]+)\](.*)$/;
+      const markerCommentRe = /^\s*<!--\s*TOPIC_CANDIDATE\s+([^\s]+)\s*(.*?)\s*-->\s*$/;
+
+      mdLines.forEach((line, idx) => {
+        let oldId = '';
+        let tail = '';
+        const m1 = line.match(markerRe);
+        const m2 = line.match(markerCommentRe);
+        if (m1) {
+          oldId = m1[1].trim();
+          tail = (m1[2] || '').trim();
+        } else if (m2) {
+          oldId = m2[1].trim();
+          tail = (m2[2] || '').trim();
+        } else {
+          return;
+        }
+
+        const csvRow = csvById.get(oldId) || null;
+        const attrs = parseMarkerAttrs(tail);
+        const reasonMatch = tail.match(/reason=([^\s]+)/);
+        const confMatch = tail.match(/confidence=([0-9.]+)/);
+        const titleMatch = tail.match(/title="([^"]*)"/);
+        const noteMatch = tail.match(/note="([^"]*)"/);
+        const prefixMatch = oldId.match(/^(.*-T)\d+$/);
+        const reasonCode = (csvRow && csvRow.reason) || attrs.reason || (reasonMatch ? reasonMatch[1] : '');
+        topics.push({
+          uid: nextTopicUid(),
+          oldId,
+          newId: oldId,
+          lineIndex: idx,
+          enabled: true,
+          reason: reasonCode,
+          reasonHuman: (csvRow && csvRow.reason_human) || explainTopicReason(reasonCode),
+          confidence: (csvRow && csvRow.confidence) || attrs.confidence || (confMatch ? confMatch[1] : ''),
+          title: (csvRow && csvRow.topic_title) || attrs.title || (titleMatch ? titleMatch[1] : ''),
+          note: (csvRow && csvRow.topic_note) || attrs.note || (noteMatch ? noteMatch[1] : ''),
+          tags: (csvRow && csvRow.tags) || attrs.tags || '',
+          indexId: (csvRow && csvRow.index_id) || attrs.index_id || '',
+          startTs: (csvRow && csvRow.start_ts) || attrs.start_ts || '',
+          endTs: (csvRow && csvRow.end_ts) || attrs.end_ts || '',
+          anchorMsgId: (csvRow && csvRow.anchor_msg_id) || attrs.anchor_msg_id || '',
+          obsidianFile: (csvRow && csvRow.obsidian_file) || attrs.obsidian_file || '',
+          sessionId: (csvRow && csvRow.session_id) || attrs.session_id || '',
+          prefix: prefixMatch ? prefixMatch[1] : (oldId + '-'),
+          hasMarkerLine: true,
+          manual: false,
+          csvRow
+        });
+      });
+
+      if (!topics.length && scopedCsvRows.length) {
+        const findLineByAnchor = anchorMsgId => {
+          if (!anchorMsgId) return mdLines.length;
+          const needle = `^${anchorMsgId}`;
+          const hit = mdLines.findIndex(l => l.trim() === needle || l.includes(needle));
+          return hit >= 0 ? Math.max(0, hit + 1) : mdLines.length;
+        };
+        scopedCsvRows.forEach(r => {
+          if (!r.topic_id) return;
+          const prefixMatch = r.topic_id.match(/^(.*-T)\d+$/);
+          const reasonCode = r.reason || '';
+          topics.push({
+            uid: nextTopicUid(),
+            oldId: r.topic_id,
+            newId: r.topic_id,
+            lineIndex: findLineByAnchor(r.anchor_msg_id),
+            enabled: true,
+            reason: reasonCode,
+            reasonHuman: r.reason_human || explainTopicReason(reasonCode),
+            confidence: r.confidence || '',
+            title: r.topic_title || '',
+            note: r.topic_note || r.note || '',
+            tags: r.tags || '',
+            indexId: r.index_id || '',
+            startTs: r.start_ts || '',
+            endTs: r.end_ts || '',
+            anchorMsgId: r.anchor_msg_id || '',
+            obsidianFile: r.obsidian_file || '',
+            sessionId: r.session_id || '',
+            prefix: prefixMatch ? prefixMatch[1] : (r.topic_id + '-'),
+            hasMarkerLine: false,
+            manual: false,
+            csvRow: r
+          });
+        });
+      }
+      return { mdLines, topics };
+    }
+
+    function renumberTopics() {
+      sortTopicsInPlace();
+      let seq = 0;
+      reviewState.topics.forEach(t => {
+        if (!t.enabled) {
+          t.newId = t.oldId;
+          return;
+        }
+        seq += 1;
+        t.newId = `${t.prefix}${String(seq).padStart(3, '0')}`;
+      });
+    }
+
+    function buildReviewedMdLines(opts = {}) {
+      const includeDebugMarkers = !!opts.includeDebugMarkers;
+      const includeTopicAnchors = opts.includeTopicAnchors !== false;
+      const includeManualHeaders = opts.includeManualHeaders !== false;
+
+      const markerByLine = new Map();
+      const manualByLine = new Map();
+      reviewState.topics.forEach(t => {
+        if (t.manual) {
+          if (!t.enabled) return;
+          const arr = manualByLine.get(t.lineIndex) || [];
+          arr.push(t);
+          manualByLine.set(t.lineIndex, arr);
+        } else if (t.hasMarkerLine) {
+          markerByLine.set(t.lineIndex, t);
+        }
+      });
+
+      const out = [];
+      const topicLineMap = new Map();
+      const pushTopicDecor = (topic, isManualInsert) => {
+        if (isManualInsert && includeManualHeaders) {
+          out.push(`### ${makeWikiLink(topic.title || '未命名主题')}`);
+          if (topic.tags) out.push(topic.tags);
+        }
+        if (includeDebugMarkers) {
+          topicLineMap.set(topic.uid, out.length);
+          out.push(formatTopicMarkerLine({
+            topic_id: topic.newId,
+            reason: topic.reason,
+            confidence: topic.confidence,
+            topic_title: topic.title,
+            topic_note: topic.note,
+            tags: topic.tags,
+            index_id: topic.indexId,
+            start_ts: topic.startTs,
+            end_ts: topic.endTs,
+            anchor_msg_id: topic.anchorMsgId,
+            session_id: topic.sessionId,
+            obsidian_file: topic.obsidianFile
+          }));
+        }
+        if (includeTopicAnchors) {
+          if (!includeDebugMarkers) topicLineMap.set(topic.uid, out.length);
+          const newNum = (topic.newId.match(/(\d+)$/) || [null, '1'])[1];
+          out.push(`^topic-${String(Number(newNum)).padStart(3, '0')}`);
+        }
+        if (isManualInsert && (includeManualHeaders || includeDebugMarkers || includeTopicAnchors)) {
+          out.push('');
+        }
+      };
+
+      const genericMarkerRe = /^\s*> \[TOPIC_CANDIDATE [^\]]+\].*$/;
+      const genericCommentMarkerRe = /^\s*<!--\s*TOPIC_CANDIDATE\s+[^\s]+\s*.*-->\s*$/;
+
+      for (let i = 0; i <= reviewState.mdLines.length; i += 1) {
+        const manualAt = manualByLine.get(i) || [];
+        manualAt.forEach(t => pushTopicDecor(t, true));
+        if (i >= reviewState.mdLines.length) break;
+
+        const line = reviewState.mdLines[i];
+        const topic = markerByLine.get(i);
+        if (!topic) {
+          if (!includeDebugMarkers && (genericMarkerRe.test(line) || genericCommentMarkerRe.test(line))) {
+            const nextRaw = reviewState.mdLines[i + 1] || '';
+            const nextTrimmed = String(nextRaw).trim();
+            if (/^\^topic-\d+$/i.test(nextTrimmed)) i += 1;
+            continue;
+          }
+          out.push(line);
+          continue;
+        }
+        const next = reviewState.mdLines[i + 1] || '';
+        const nextIsAnchor = /^\^topic-\d+$/i.test(next.trim());
+        if (topic.enabled) {
+          pushTopicDecor(topic, false);
+        }
+        if (nextIsAnchor) i += 1;
+      }
+      return { lines: out, topicLineMap };
+    }
+
+    function jumpToTopic(topic) {
+      const preview = document.getElementById('reviewMdPreview');
+      const findByAnchorMsg = () => {
+        const anchor = String(topic.anchorMsgId || '').trim();
+        if (!anchor) return null;
+        const wanted = `^${anchor}`;
+        const chips = Array.from(preview.querySelectorAll('.anchor-chip.msg'));
+        return chips.find(el => (el.textContent || '').trim() === wanted) || null;
+      };
+      const findNearestByLine = (lineNo) => {
+        const nodes = Array.from(preview.querySelectorAll('[data-line]'));
+        if (!nodes.length) return null;
+        let best = null;
+        let bestDist = Number.POSITIVE_INFINITY;
+        nodes.forEach(node => {
+          const raw = node.getAttribute('data-line');
+          const n = Number(raw);
+          if (!Number.isFinite(n)) return;
+          const d = Math.abs(n - lineNo);
+          if (d < bestDist) {
+            bestDist = d;
+            best = node;
+          }
+        });
+        return best;
+      };
+      let lineNo = reviewState.topicOutputLineMap.get(topic.uid);
+      if (lineNo === undefined) {
+        const fallbackIdx = (reviewState.renderedLines || []).findIndex(l => {
+          const s = String(l || '');
+          return s.includes(`TOPIC_CANDIDATE ${topic.newId}`) || s.includes(`TOPIC_CANDIDATE ${topic.oldId}`);
+        });
+        lineNo = fallbackIdx >= 0 ? fallbackIdx : undefined;
+      }
+      if (lineNo === undefined && Number.isFinite(topic.lineIndex)) {
+        lineNo = topic.lineIndex;
+      }
+      if (lineNo === undefined) {
+        document.getElementById('reviewStatus').textContent = `定位失败：未找到 ${topic.newId}`;
+        return;
+      }
+      preview.querySelectorAll('.topic-marker.focus').forEach(el => el.classList.remove('focus'));
+      preview.querySelectorAll('.jump-focus').forEach(el => el.classList.remove('jump-focus'));
+      let target = preview.querySelector(`[data-line="${lineNo}"]`);
+      if (!target) target = findByAnchorMsg();
+      if (!target) target = findNearestByLine(lineNo);
+      if (!target) {
+        document.getElementById('reviewStatus').textContent = `定位失败：预览中未找到行 ${lineNo + 1}`;
+        return;
+      }
+      if (target.classList.contains('topic-marker')) target.classList.add('focus');
+      else target.classList.add('jump-focus');
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      reviewState.focusedLine = lineNo;
+      document.getElementById('reviewStatus').textContent = `已定位：${topic.newId}`;
+    }
+
+    function renderReviewPreview() {
+      const preview = document.getElementById('reviewMdPreview');
+      if (!reviewState.mdLines.length) {
+        preview.textContent = '等待加载 topic 标记原文';
+        return;
+      }
+      const previewDebug = !!(document.getElementById('reviewExportDebug') && document.getElementById('reviewExportDebug').checked);
+      const built = buildReviewedMdLines({
+        includeDebugMarkers: previewDebug,
+        includeTopicAnchors: true,
+        includeManualHeaders: true
+      });
+      reviewState.renderedLines = built.lines;
+      reviewState.topicOutputLineMap = built.topicLineMap;
+
+      preview.innerHTML = '';
+      const stream = document.createElement('div');
+      stream.className = 'review-stream';
+
+      const lines = built.lines;
+      let i = 0;
+      const topicCommentRe = /^<!--\s*TOPIC_CANDIDATE\s+[^\s]+\s*.*-->$/;
+      const topicLegacyRe = /^> \[TOPIC_CANDIDATE [^\]]+\].*$/;
+      const topicSectionRe = /^###\s+\[\[([^\]]+)\]\]\s*$/;
+      const topicTagLineRe = /^#topic\/\S+(?:\s+#\S+)*\s*$/;
+      const msgAnchorRe = /^\^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+      const msgHeaderRe = /^\s*\[([^\]]+)\]\s+(user|char|assistant|system)(?:\s+@\s+(.+))?:\s*$/i;
+      const bindAnchorPick = chip => {
+        chip.classList.add('pickable');
+        chip.title = '点击把这个锚点填入“手动新增”定位框';
+        chip.addEventListener('click', () => {
+          const raw = (chip.textContent || '').trim().replace(/^\^/, '');
+          if (!raw) return;
+          const anchorInput = document.getElementById('manualTopicAnchor');
+          if (anchorInput) anchorInput.value = raw;
+          preview.querySelectorAll('.anchor-chip.selected').forEach(el => el.classList.remove('selected'));
+          chip.classList.add('selected');
+          document.getElementById('reviewStatus').textContent = `已选锚点：${raw}`;
+        });
+      };
+      while (i < lines.length) {
+        const line = lines[i] || '';
+        const trimmed = line.trim();
+
+        if (!trimmed) {
+          i += 1;
+          continue;
+        }
+
+        if (topicCommentRe.test(trimmed) || topicLegacyRe.test(trimmed)) {
+          const marker = document.createElement('div');
+          marker.className = 'topic-marker';
+          marker.dataset.line = String(i);
+          if (reviewState.focusedLine === i) marker.classList.add('focus');
+          const c = trimmed.match(/^<!--\s*TOPIC_CANDIDATE\s+([^\s]+)\s*(.*?)\s*-->$/);
+          const l = trimmed.match(/^> \[TOPIC_CANDIDATE ([^\]]+)\](.*)$/);
+          if (c) {
+            const attrs = parseMarkerAttrs(c[2] || '');
+            const reasonText = explainTopicReason(attrs.reason || '');
+            marker.textContent = `[topic] ${c[1]} · ${attrs.title || '未命名'} · ${reasonText} · conf=${attrs.confidence || ''}`;
+          } else if (l) {
+            const reason = (l[2].match(/reason=([^\s]+)/) || [null, ''])[1];
+            const conf = (l[2].match(/confidence=([0-9.]+)/) || [null, ''])[1];
+            marker.textContent = `[topic] ${l[1]} · ${explainTopicReason(reason)} · conf=${conf}`;
+          } else {
+            marker.textContent = trimmed;
+          }
+          stream.appendChild(marker);
+          i += 1;
+          continue;
+        }
+
+        const topicSection = trimmed.match(topicSectionRe);
+        if (topicSection) {
+          const marker = document.createElement('div');
+          marker.className = 'topic-marker';
+          marker.dataset.line = String(i);
+          marker.textContent = `[topic-section] ${topicSection[1]}`;
+          stream.appendChild(marker);
+          i += 1;
+          if (i < lines.length) {
+            const maybeTag = String(lines[i] || '').trim();
+            if (topicTagLineRe.test(maybeTag)) {
+              const tagLine = document.createElement('div');
+              tagLine.className = 'topic-marker';
+              tagLine.dataset.line = String(i);
+              tagLine.textContent = maybeTag;
+              stream.appendChild(tagLine);
+              i += 1;
+            }
+          }
+          continue;
+        }
+
+        if (/^\^topic-\d+/i.test(trimmed)) {
+          const chip = document.createElement('div');
+          chip.className = 'anchor-chip topic';
+          chip.dataset.line = String(i);
+          chip.textContent = trimmed;
+          stream.appendChild(chip);
+          i += 1;
+          continue;
+        }
+
+        const msgHeader = line.match(msgHeaderRe);
+        if (msgHeader) {
+          const headerLine = i;
+          const ts = msgHeader[1];
+          const rawRole = String(msgHeader[2] || '').toLowerCase();
+          const role = rawRole === 'user' ? 'user' : (rawRole === 'system' ? 'system' : 'assistant');
+          const title = (msgHeader[3] || '').trim();
+          i += 1;
+          const contentLines = [];
+          while (i < lines.length) {
+            const probe = (lines[i] || '').trim();
+            if (topicCommentRe.test(probe) || topicLegacyRe.test(probe)) break;
+            if (topicSectionRe.test(probe) || topicTagLineRe.test(probe)) break;
+            if (/^\^topic-\d+/i.test(probe)) break;
+            if (msgAnchorRe.test(probe)) break;
+            if (msgHeaderRe.test(lines[i])) break;
+            contentLines.push(lines[i]);
+            i += 1;
+          }
+          const messageText = contentLines.join('\n').trimEnd();
+          const isSystemHint = /^Model set context updated\.?$/i.test(messageText.trim());
+
+          if (isSystemHint) {
+            const note = document.createElement('div');
+            note.className = 'system-note';
+            note.dataset.line = String(headerLine);
+            note.textContent = messageText.trim();
+            stream.appendChild(note);
+            if (i < lines.length && msgAnchorRe.test((lines[i] || '').trim())) {
+              const chip = document.createElement('div');
+              chip.className = 'anchor-chip msg';
+              chip.dataset.line = String(i);
+              chip.textContent = lines[i].trim();
+              bindAnchorPick(chip);
+              stream.appendChild(chip);
+              i += 1;
+            }
+            continue;
+          }
+
+          const row = document.createElement('div');
+          row.className = `msg-row ${role === 'user' ? 'user' : 'assistant'}`;
+          const bubble = document.createElement('div');
+          bubble.className = `bubble ${role === 'user' ? 'user' : 'assistant'}`;
+          const bubbleMeta = document.createElement('div');
+          bubbleMeta.className = 'meta';
+          const roleLabel = role === 'user' ? 'user' : (rawRole === 'system' ? 'system' : 'char');
+          bubbleMeta.textContent = title
+            ? `[${ts}] ${roleLabel} @ ${title}`
+            : `[${ts}] ${roleLabel}`;
+          const body = document.createElement('div');
+          body.textContent = messageText;
+          bubble.appendChild(bubbleMeta);
+          bubble.appendChild(body);
+          row.appendChild(bubble);
+          row.dataset.line = String(headerLine);
+          stream.appendChild(row);
+
+          if (i < lines.length && msgAnchorRe.test((lines[i] || '').trim())) {
+            const chip = document.createElement('div');
+            chip.className = 'anchor-chip msg';
+            chip.dataset.line = String(i);
+            chip.textContent = lines[i].trim();
+            bindAnchorPick(chip);
+            stream.appendChild(chip);
+            i += 1;
+          }
+          continue;
+        }
+
+        if (msgAnchorRe.test(trimmed)) {
+          const chip = document.createElement('div');
+          chip.className = 'anchor-chip msg';
+          chip.dataset.line = String(i);
+          chip.textContent = trimmed;
+          bindAnchorPick(chip);
+          stream.appendChild(chip);
+          i += 1;
+          continue;
+        }
+
+        const plain = document.createElement('div');
+        plain.className = 'plain-line';
+        plain.dataset.line = String(i);
+        plain.textContent = line;
+        stream.appendChild(plain);
+        i += 1;
+      }
+      preview.appendChild(stream);
+    }
+
+    function renderTopicList() {
+      const box = document.getElementById('topicList');
+      box.innerHTML = '';
+      if (!reviewState.topics.length) {
+        box.textContent = '未发现主题候选（可同时导入 topic_map_*.csv）';
+        return;
+      }
+      sortTopicsInPlace();
+      reviewState.topics.forEach((t, idx) => {
+        const row = document.createElement('div');
+        row.className = 'topic-row';
+        if (!t.enabled) row.classList.add('topic-muted');
+
+        const head = document.createElement('div');
+        head.className = 'row';
+        head.style.alignItems = 'center';
+        head.style.justifyContent = 'space-between';
+
+        const left = document.createElement('div');
+        const toggle = document.createElement('input');
+        toggle.type = 'checkbox';
+        toggle.checked = t.enabled;
+        toggle.style.marginRight = '8px';
+        toggle.onchange = () => {
+          t.enabled = toggle.checked;
+          renumberTopics();
+          renderTopicList();
+          renderReviewPreview();
+        };
+        const idNode = document.createElement('span');
+        idNode.className = 'topic-id';
+        idNode.textContent = `${String(idx + 1).padStart(3, '0')} · ${t.newId}${t.newId !== t.oldId ? ` (原 ${t.oldId})` : ''}`;
+        left.appendChild(toggle);
+        left.appendChild(idNode);
+
+        const jumpBtn = document.createElement('button');
+        jumpBtn.className = 'btn ghost';
+        jumpBtn.textContent = '定位';
+        jumpBtn.onclick = () => jumpToTopic(t);
+
+        head.appendChild(left);
+        head.appendChild(jumpBtn);
+
+        const meta = document.createElement('div');
+        meta.className = 'topic-meta';
+        const reasonHuman = t.reasonHuman || explainTopicReason(t.reason);
+        const conf = t.confidence || 'n/a';
+        const idxText = t.indexId ? ` · index_id=${t.indexId}` : '';
+        meta.textContent = `判定：${reasonHuman} · confidence=${conf} · line=${t.lineIndex + 1}${idxText}`;
+
+        const edit = document.createElement('div');
+        edit.className = 'topic-edit';
+        const titleInput = document.createElement('input');
+        titleInput.value = t.title || '';
+        titleInput.placeholder = '主题标题（建议：关键词+场景，如 审稿回复情绪管理）';
+        titleInput.oninput = () => {
+          t.title = titleInput.value;
+          if (!t.tags || t.tags.startsWith('#topic/')) {
+            t.tags = `#topic/${normalizeTopicTag(t.title || 'topic')}`;
+          }
+          renderReviewPreview();
+        };
+        const tagInput = document.createElement('input');
+        tagInput.value = t.tags || '';
+        tagInput.placeholder = '标签（示例：#topic/审稿回复 #emotion/irritated）';
+        tagInput.oninput = () => {
+          t.tags = tagInput.value;
+          renderReviewPreview();
+        };
+        const indexInput = document.createElement('input');
+        indexInput.value = t.indexId || '';
+        indexInput.placeholder = 'Notion index_id（可选，例如 00123）';
+        indexInput.oninput = () => {
+          t.indexId = indexInput.value;
+          renderReviewPreview();
+        };
+        const noteInput = document.createElement('input');
+        noteInput.value = t.note || '';
+        noteInput.placeholder = '备注（可选）';
+        noteInput.oninput = () => {
+          t.note = noteInput.value;
+          renderReviewPreview();
+        };
+        edit.appendChild(titleInput);
+        edit.appendChild(tagInput);
+        edit.appendChild(indexInput);
+        edit.appendChild(noteInput);
+
+        row.appendChild(head);
+        row.appendChild(meta);
+        row.appendChild(edit);
+        box.appendChild(row);
+      });
+    }
+
+    function resetReviewState(message) {
+      reviewState = {
+        mdName: '',
+        mdLines: [],
+        topics: [],
+        csvHeaders: [],
+        csvRows: [],
+        renderedLines: [],
+        topicOutputLineMap: new Map(),
+        focusedLine: -1,
+        uidSeed: 1,
+        sidecarMeta: {}
+      };
+      document.getElementById('reviewMdPreview').textContent = '等待加载 topic 标记原文';
+      document.getElementById('topicList').textContent = '等待加载';
+      document.getElementById('reviewStatus').textContent = message || '';
+      const anchorEl = document.getElementById('manualTopicAnchor');
+      const titleEl = document.getElementById('manualTopicTitle');
+      if (anchorEl) anchorEl.value = '';
+      if (titleEl) titleEl.value = '';
+    }
+
+    function applySidecarToTopics(sidecarObj) {
+      if (!sidecarObj || !Array.isArray(sidecarObj.topics)) return;
+      const byId = new Map();
+      reviewState.topics.forEach(t => {
+        byId.set(t.oldId, t);
+        byId.set(t.newId, t);
+      });
+
+      sidecarObj.topics.forEach(item => {
+        if (!item) return;
+        const topicId = item.topic_id || item.old_id || item.new_id || '';
+        const target = topicId ? byId.get(topicId) : null;
+        if (target) {
+          if (typeof item.enabled === 'boolean') target.enabled = item.enabled;
+          if (item.topic_title != null) target.title = item.topic_title;
+          if (item.topic_note != null) target.note = item.topic_note;
+          if (item.tags != null) target.tags = item.tags;
+          if (item.index_id != null) target.indexId = item.index_id;
+          if (item.reason != null) {
+            target.reason = item.reason;
+            target.reasonHuman = explainTopicReason(item.reason);
+          }
+          if (item.reason_human != null) target.reasonHuman = item.reason_human;
+          if (item.confidence != null) target.confidence = item.confidence;
+          if (item.anchor_msg_id != null) target.anchorMsgId = item.anchor_msg_id;
+          if (item.session_id != null) target.sessionId = item.session_id;
+          if (item.obsidian_file != null) target.obsidianFile = item.obsidian_file;
+          if (item.start_ts != null) target.startTs = item.start_ts;
+          if (item.end_ts != null) target.endTs = item.end_ts;
+          return;
+        }
+
+        if (item.source === 'manual' && topicId) {
+          const uid = nextTopicUid();
+          const prefixMatch = topicId.match(/^(.*-T)\d+$/);
+          reviewState.topics.push({
+            uid,
+            oldId: topicId,
+            newId: topicId,
+            lineIndex: Math.max(0, Number(item.line_index || reviewState.mdLines.length) - 1),
+            enabled: item.enabled !== false,
+            reason: item.reason || 'manual',
+            reasonHuman: explainTopicReason(item.reason || 'manual'),
+            confidence: item.confidence || '1.00',
+            title: item.topic_title || '手动主题',
+            note: item.topic_note || '',
+            tags: item.tags || '#topic/topic',
+            indexId: item.index_id || '',
+            startTs: item.start_ts || '',
+            endTs: item.end_ts || '',
+            anchorMsgId: item.anchor_msg_id || '',
+            obsidianFile: item.obsidian_file || reviewState.mdName || '',
+            sessionId: item.session_id || selectedMonth || '',
+            prefix: prefixMatch ? prefixMatch[1] : getDefaultTopicPrefix(),
+            hasMarkerLine: false,
+            manual: true,
+            csvRow: null
+          });
+        }
+      });
+    }
+
+    document.getElementById('parseBtn').addEventListener('click', async () => {
+      const file = document.getElementById('convFile').files[0];
+      const status = document.getElementById('status');
+      status.textContent = '';
+      if (!file) {
+        status.textContent = '请先上传 conversations.json';
+        return;
+      }
+      try {
+        status.textContent = '正在解析…';
+        const text = await file.text();
+        const json = JSON.parse(text);
+        allConversations = parseOpenAIJson(json);
+        monthIndex = buildMonthIndex(allConversations);
+        selectedMonth = null;
+        selectedConvIds = new Set();
+        searchState = { keyword: '', scope: 'selected', results: [], total: 0, truncated: false };
+        document.getElementById('searchInput').value = '';
+        document.getElementById('searchScope').value = 'selected';
+        setSearchStatus('');
+        renderMonths();
+        renderWindows();
+        renderPreview();
+        status.textContent = `加载完成：${allConversations.length} 个窗口`;
+      } catch (e) {
+        status.textContent = '解析失败：' + e.message;
+      }
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      allConversations = [];
+      monthIndex = {};
+      selectedMonth = null;
+      selectedConvIds = new Set();
+      searchState = { keyword: '', scope: 'selected', results: [], total: 0, truncated: false };
+      document.getElementById('monthList').textContent = '未加载';
+      document.getElementById('windowList').textContent = '请选择月份';
+      document.getElementById('previewPane').textContent = '等待加载';
+      document.getElementById('status').textContent = '';
+      document.getElementById('searchInput').value = '';
+      document.getElementById('searchScope').value = 'selected';
+      setSearchStatus('');
+    });
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const page = btn.getAttribute('data-page');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        const pageEl = document.getElementById(page);
+        if (pageEl) pageEl.classList.add('active');
+      });
+    });
+
+    document.getElementById('minCount').addEventListener('change', () => {
+      renderWindows();
+      if (searchState.keyword) runSearch(true);
+      else renderPreview();
+    });
+
+    document.getElementById('selectAllBtn').addEventListener('click', () => {
+      if (!selectedMonth || !monthIndex[selectedMonth]) return;
+      const minCount = parseInt(document.getElementById('minCount').value || '0', 10);
+      monthIndex[selectedMonth].filter(c => c.count >= minCount).forEach(c => selectedConvIds.add(c.id));
+      renderWindows();
+      if (searchState.keyword) runSearch(true);
+      else renderPreview();
+    });
+
+    document.getElementById('selectAllGlobalBtn').addEventListener('click', () => {
+      Object.keys(monthIndex).forEach(k => {
+        (monthIndex[k] || []).forEach(c => selectedConvIds.add(c.id));
+      });
+      renderWindows();
+      if (searchState.keyword) runSearch(true);
+      else renderPreview();
+      document.getElementById('status').textContent = `已全局勾选 ${selectedConvIds.size} 个窗口（忽略最小消息数过滤）`;
+    });
+
+    document.getElementById('clearSelectBtn').addEventListener('click', () => {
+      selectedConvIds = new Set();
+      renderWindows();
+      if (searchState.keyword) runSearch(true);
+      else renderPreview();
+    });
+
+    document.getElementById('searchBtn').addEventListener('click', () => {
+      runSearch(true);
+    });
+
+    document.getElementById('clearSearchBtn').addEventListener('click', () => {
+      document.getElementById('searchInput').value = '';
+      searchState = { keyword: '', scope: document.getElementById('searchScope').value || 'selected', results: [], total: 0, truncated: false };
+      setSearchStatus('');
+      renderPreview();
+    });
+
+    document.getElementById('searchInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        runSearch(true);
+      }
+    });
+
+    document.getElementById('searchScope').addEventListener('change', () => {
+      if (searchState.keyword || (document.getElementById('searchInput').value || '').trim()) {
+        runSearch(true);
+      }
+    });
+
+    document.getElementById('loadReviewBtn').addEventListener('click', async () => {
+      const mdFile = document.getElementById('reviewMdFile').files[0];
+      const csvFile = document.getElementById('reviewCsvFile').files[0];
+      const sidecarFile = document.getElementById('reviewSidecarFile').files[0];
+      if (!mdFile) {
+        resetReviewState('请先选择 MD 文件。');
+        return;
+      }
+      try {
+        const mdText = await mdFile.text();
+        reviewState.uidSeed = 1;
+        let csvHeaders = [];
+        let csvRows = [];
+        if (csvFile) {
+          const csvText = await csvFile.text();
+          const parsed = parseCsvText(csvText);
+          csvHeaders = parsed.headers;
+          csvRows = parsed.rows;
+        }
+        const parsedTopics = parseTopicMarkersFromMd(mdText, csvRows, mdFile.name || '');
+        reviewState = {
+          mdName: mdFile.name || 'review',
+          mdLines: parsedTopics.mdLines,
+          topics: parsedTopics.topics,
+          csvHeaders,
+          csvRows,
+          renderedLines: [],
+          topicOutputLineMap: new Map(),
+          focusedLine: -1,
+          uidSeed: reviewState.uidSeed,
+          sidecarMeta: {}
+        };
+        if (sidecarFile) {
+          const sidecarText = await sidecarFile.text();
+          const sidecarObj = JSON.parse(sidecarText);
+          reviewState.sidecarMeta = {
+            version: sidecarObj.version || 1,
+            source: sidecarFile.name || 'sidecar'
+          };
+          applySidecarToTopics(sidecarObj);
+        }
+        renumberTopics();
+        renderTopicList();
+        renderReviewPreview();
+        document.getElementById('reviewStatus').textContent = `已加载 ${reviewState.topics.length} 个 topic 标记${sidecarFile ? '（已应用 sidecar）' : ''}`;
+      } catch (e) {
+        resetReviewState(`载入失败：${e.message}`);
+      }
+    });
+
+    document.getElementById('resetReviewBtn').addEventListener('click', () => {
+      document.getElementById('reviewMdFile').value = '';
+      document.getElementById('reviewCsvFile').value = '';
+      document.getElementById('reviewSidecarFile').value = '';
+      document.getElementById('manualTopicAnchor').value = '';
+      document.getElementById('manualTopicTitle').value = '';
+      resetReviewState('');
+    });
+
+    document.getElementById('keepAllTopicsBtn').addEventListener('click', () => {
+      if (!reviewState.topics.length) return;
+      reviewState.topics.forEach(t => { t.enabled = true; });
+      renumberTopics();
+      renderTopicList();
+      renderReviewPreview();
+    });
+
+    document.getElementById('dropAllTopicsBtn').addEventListener('click', () => {
+      if (!reviewState.topics.length) return;
+      reviewState.topics.forEach(t => { t.enabled = false; });
+      renumberTopics();
+      renderTopicList();
+      renderReviewPreview();
+    });
+
+    document.getElementById('addManualTopicBtn').addEventListener('click', () => {
+      if (!reviewState.mdLines.length) {
+        document.getElementById('reviewStatus').textContent = '请先载入审阅文件。';
+        return;
+      }
+      const anchorRaw = (document.getElementById('manualTopicAnchor').value || '').trim();
+      const anchor = anchorRaw.replace(/^\^/, '');
+      const title = (document.getElementById('manualTopicTitle').value || '').trim();
+      let lineIndex = reviewState.mdLines.length;
+      if (anchor) {
+        const needle = `^${anchor}`;
+        const idx = reviewState.mdLines.findIndex(l => l.trim() === needle || l.includes(needle));
+        if (idx === -1) {
+          document.getElementById('reviewStatus').textContent = `未找到锚点：${anchor}`;
+          return;
+        }
+        lineIndex = Math.max(0, idx + 1);
+      }
+      const uid = nextTopicUid();
+      const prefix = getDefaultTopicPrefix();
+      const oldId = `manual-${uid}`;
+      reviewState.topics.push({
+        uid,
+        oldId,
+        newId: oldId,
+        lineIndex,
+        enabled: true,
+        reason: 'manual',
+        reasonHuman: '手动新增',
+        confidence: '1.00',
+        title: title || '手动主题',
+        tags: title ? `#topic/${normalizeTopicTag(title)}` : '#topic/topic',
+        indexId: '',
+        startTs: '',
+        endTs: '',
+        anchorMsgId: anchor || '',
+        obsidianFile: reviewState.mdName || '',
+        sessionId: selectedMonth || '',
+        note: anchor ? `基于锚点 ${anchor} 手动新增` : '手动新增',
+        prefix,
+        hasMarkerLine: false,
+        manual: true,
+        csvRow: null
+      });
+      renumberTopics();
+      renderTopicList();
+      renderReviewPreview();
+      document.getElementById('reviewStatus').textContent = '已新增 1 条手动 topic。';
+    });
+
+    document.getElementById('exportReviewedMdBtn').addEventListener('click', () => {
+      if (!reviewState.mdLines.length) {
+        document.getElementById('reviewStatus').textContent = '请先载入审阅文件。';
+        return;
+      }
+      const keepDebug = !!(document.getElementById('reviewExportDebug') && document.getElementById('reviewExportDebug').checked);
+      const reviewed = buildReviewedMdLines({
+        includeDebugMarkers: keepDebug,
+        includeTopicAnchors: false,
+        includeManualHeaders: true
+      }).lines.join('\n');
+      const base = safeFileName((reviewState.mdName || 'topic-review').replace(/\.md$/i, ''));
+      downloadBlob(new Blob([reviewed], { type: 'text/markdown' }), `${base}-reviewed.md`);
+      document.getElementById('reviewStatus').textContent = '修订 MD 已导出。';
+    });
+
+    document.getElementById('reviewExportDebug').addEventListener('change', () => {
+      if (!reviewState.mdLines.length) return;
+      renderReviewPreview();
+    });
+
+    document.getElementById('exportReviewedCsvBtn').addEventListener('click', () => {
+      if (!reviewState.topics.length) {
+        document.getElementById('reviewStatus').textContent = '请先载入带 topic 标记的文件。';
+        return;
+      }
+      const headers = [
+        'index_id',
+        'topic_id',
+        'topic_title',
+        'obsidian_file',
+        'obsidian_anchor',
+        'session_id',
+        'start_ts',
+        'end_ts',
+        'tags',
+        'wikilinks',
+        'note',
+        'summary',
+        'reason',
+        'reason_human',
+        'confidence',
+        'anchor_msg_id',
+        'line_index',
+        'source'
+      ];
+      const rows = reviewState.topics
+        .filter(t => t.enabled)
+        .map(t => ({
+          index_id: t.indexId || '',
+          topic_id: t.newId,
+          topic_title: t.title || '',
+          obsidian_file: t.obsidianFile || reviewState.mdName || '',
+          obsidian_anchor: `topic-${t.newId}`,
+          session_id: t.sessionId || selectedMonth || '',
+          start_ts: t.startTs || '',
+          end_ts: t.endTs || '',
+          tags: t.tags || '',
+          wikilinks: makeWikiLink(t.title || '未命名主题'),
+          note: t.note || '',
+          summary: '',
+          reason: t.reason || '',
+          reason_human: t.reasonHuman || explainTopicReason(t.reason),
+          confidence: t.confidence || '',
+          anchor_msg_id: t.anchorMsgId || '',
+          line_index: String(t.lineIndex + 1),
+          source: t.manual ? 'manual' : 'auto'
+        }));
+      const csv = toCsv(rows, headers);
+      const base = safeFileName((reviewState.mdName || 'topic-review').replace(/\.md$/i, ''));
+      downloadBlob(new Blob([csv], { type: 'text/csv' }), `${base}-topic-index-reviewed.csv`);
+      document.getElementById('reviewStatus').textContent = '修订 CSV 已导出。';
+    });
+
+    document.getElementById('exportSidecarBtn').addEventListener('click', () => {
+      if (!reviewState.topics.length) {
+        document.getElementById('reviewStatus').textContent = '请先载入并编辑 topic。';
+        return;
+      }
+      const payload = {
+        version: 1,
+        md_file: reviewState.mdName || '',
+        generated_at: new Date().toISOString(),
+        topics: reviewState.topics.map(t => ({
+          topic_id: t.newId,
+          old_id: t.oldId,
+          enabled: !!t.enabled,
+          line_index: t.lineIndex + 1,
+          topic_title: t.title || '',
+          topic_note: t.note || '',
+          tags: t.tags || '',
+          index_id: t.indexId || '',
+          reason: t.reason || '',
+          reason_human: t.reasonHuman || explainTopicReason(t.reason),
+          confidence: t.confidence || '',
+          anchor_msg_id: t.anchorMsgId || '',
+          session_id: t.sessionId || '',
+          obsidian_file: t.obsidianFile || '',
+          start_ts: t.startTs || '',
+          end_ts: t.endTs || '',
+          source: t.manual ? 'manual' : 'auto'
+        }))
+      };
+      const base = safeFileName((reviewState.mdName || 'topic-review').replace(/\.md$/i, ''));
+      downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }), `${base}-annotations.sidecar.json`);
+      document.getElementById('reviewStatus').textContent = 'sidecar 已导出。';
+    });
+
+    document.getElementById('exportMdBtn').addEventListener('click', () => {
+      const status = document.getElementById('status');
+      const picked = getSelectedConversations();
+      if (picked.error) {
+        status.textContent = picked.error;
+        return;
+      }
+      const { chosen } = picked;
+      const scopeLabel = getExportScopeLabel(chosen);
+      const exportName = document.getElementById('exportName').value || 'pawtrail-archive';
+      const md = buildMarkdown(chosen, scopeLabel, false);
+      const blob = new Blob([md], { type: 'text/markdown' });
+      downloadBlob(blob, `${exportName}-${scopeLabel}.md`);
+      status.textContent = `已导出 ${chosen.length} 个窗口（纯原样合并md，范围 ${scopeLabel}）`;
+    });
+
+    document.getElementById('exportWindowZipBtn').addEventListener('click', async () => {
+      const status = document.getElementById('status');
+      const picked = getSelectedConversations();
+      if (picked.error) {
+        status.textContent = picked.error;
+        return;
+      }
+      const { chosen } = picked;
+      const scopeLabel = getExportScopeLabel(chosen);
+      const includeAnchorsBase = document.getElementById('withAnchors').checked;
+      const msgAnchorStyle = document.getElementById('msgAnchorStyle').value || 'custom';
+      const msgAnchorTemplate = (document.getElementById('msgAnchorTemplate').value || '').trim() || 'm-{scope}-{conv}-{msg}';
+      const withTopicSectionsBase = document.getElementById('withTopicSections').checked;
+      const withTopicMarkers = document.getElementById('withTopicMarkers').checked;
+      const withTopicCsv = document.getElementById('withTopicCsv').checked;
+      const withTopicSections = withTopicSectionsBase || withTopicMarkers;
+      const includeAnchors = withTopicSections ? true : includeAnchorsBase;
+      const withFrontmatter = document.getElementById('withFrontmatter').checked;
+      const withFrontmatterIndexId = document.getElementById('withFrontmatterIndexId').checked;
+      const topicGapHours = Math.max(1, Math.min(24, Number(document.getElementById('topicGapHours').value || 4)));
+      const exportName = document.getElementById('exportName').value || 'pawtrail-archive';
+      let windowTopicSeq = 1;
+      const topicRows = [];
+      const entries = chosen.map(conv => {
+        const shortId = safeFileName(String(conv.id || 'conv').slice(0, 8));
+        const title = safeFileName(conv.title || 'Conversation');
+        const filePath = `by_window/${title}-${shortId}.md`;
+        const built = buildWindowMarkdown(conv, includeAnchors, {
+          withTopicSections,
+          withTopicMarkers,
+          withFrontmatter,
+          withFrontmatterIndexId,
+          msgAnchorStyle,
+          msgAnchorTemplate,
+          topicGapHours,
+          sessionId: scopeLabel,
+          obsidianFile: filePath
+        });
+        built.segments.forEach(seg => {
+          const indexId = String(windowTopicSeq).padStart(5, '0');
+          windowTopicSeq += 1;
+          topicRows.push({
+            index_id: indexId,
+            topic_id: seg.topic_id,
+            topic_title: seg.topic_title,
+            obsidian_file: filePath,
+            obsidian_anchor: `topic-${seg.topic_id}`,
+            session_id: scopeLabel,
+            thread_id: String(conv.id || ''),
+            date: formatDate(conv.range.start || conv.range.end || 0),
+            start_ts: seg.start_ts,
+            end_ts: seg.end_ts,
+            tags: seg.tags || '',
+            wikilinks: makeWikiLink(seg.topic_title || '未命名主题'),
+            note: seg.topic_note || '',
+            summary: '',
+            reason: seg.reason || '',
+            reason_human: seg.reason_human || explainTopicReason(seg.reason || ''),
+            confidence: seg.confidence || '',
+            anchor_msg_id: seg.anchor_msg_id || '',
+            topic_note: seg.topic_note || '',
+            window_title: conv.title || '',
+            window_id: String(conv.id || '')
+          });
+        });
+        return {
+          name: filePath,
+          content: built.markdown,
+          type: 'text/markdown'
+        };
+      });
+      if (withTopicCsv && withTopicSections) {
+        entries.push({
+          name: `topic_map_by_window_${scopeLabel}.csv`,
+          content: toCsv(topicRows, ['index_id', 'topic_id', 'topic_title', 'obsidian_file', 'obsidian_anchor', 'session_id', 'thread_id', 'date', 'start_ts', 'end_ts', 'tags', 'wikilinks', 'note', 'summary', 'reason', 'reason_human', 'confidence', 'anchor_msg_id', 'topic_note', 'window_title', 'window_id']),
+          type: 'text/csv'
+        });
+      }
+      status.textContent = '正在打包按窗口 ZIP…';
+      const zipped = await downloadZipEntries(entries, `${exportName}-${scopeLabel}-by-window.zip`);
+      if (zipped) {
+        status.textContent = withTopicSections && !includeAnchorsBase
+          ? `已导出按窗口ZIP（${entries.length} 文件，topic模式已自动附加锚点）`
+          : `已导出按窗口ZIP（${entries.length} 文件）`;
+      } else {
+        status.textContent = 'JSZip 未加载，已改为逐个下载（浏览器可能拦截部分下载）';
+      }
+    });
+
+    document.getElementById('exportDayZipBtn').addEventListener('click', async () => {
+      const status = document.getElementById('status');
+      const picked = getSelectedConversations();
+      if (picked.error) {
+        status.textContent = picked.error;
+        return;
+      }
+      const { chosen } = picked;
+      const scopeLabel = getExportScopeLabel(chosen);
+      const exportName = document.getElementById('exportName').value || 'pawtrail-archive';
+      const withAnchorsBase = document.getElementById('withAnchors').checked;
+      const msgAnchorStyle = document.getElementById('msgAnchorStyle').value || 'custom';
+      const msgAnchorTemplate = (document.getElementById('msgAnchorTemplate').value || '').trim() || 'm-{scope}-{conv}-{msg}';
+      const withTopicSectionsBase = document.getElementById('withTopicSections').checked;
+      const withTopicMarkers = document.getElementById('withTopicMarkers').checked;
+      const withObsidianLinks = document.getElementById('withObsidianLinks').checked;
+      const withTopicCsv = document.getElementById('withTopicCsv').checked;
+      const withTopicSections = withTopicSectionsBase || withTopicMarkers;
+      const withAnchors = withTopicSections ? true : withAnchorsBase;
+      const withFrontmatter = document.getElementById('withFrontmatter').checked;
+      const withFrontmatterIndexId = document.getElementById('withFrontmatterIndexId').checked;
+      const topicGapHours = Math.max(1, Math.min(24, Number(document.getElementById('topicGapHours').value || 4)));
+      const entries = buildDayExport(chosen, {
+        exportBase: exportName,
+        sessionId: scopeLabel,
+        withAnchors,
+        withTopicSections,
+        withTopicMarkers,
+        msgAnchorStyle,
+        msgAnchorTemplate,
+        withObsidianLinks,
+        withTopicCsv,
+        withFrontmatter,
+        withFrontmatterIndexId,
+        topicGapHours
+      });
+      status.textContent = '正在打包按天重拼 ZIP…';
+      const zipped = await downloadZipEntries(entries, `${exportName}-${scopeLabel}-by-day.zip`);
+      if (zipped) {
+        status.textContent = withTopicSections && !withAnchorsBase
+          ? `已导出按天重拼ZIP（${entries.length} 文件，topic模式已自动附加锚点）`
+          : `已导出按天重拼ZIP（${entries.length} 文件）`;
+      } else {
+        status.textContent = 'JSZip 未加载，已改为逐个下载（浏览器可能拦截部分下载）';
+      }
+    });
+  </script>
+</body>
+</html>
