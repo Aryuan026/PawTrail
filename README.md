@@ -1,6 +1,6 @@
-# PawTrail Archive Tool
+# PawTrail Archive Tool v0.1
 
-PawTrail 用来把 `conversations.json` 整理成可读、可检索、可审阅的记忆文件。
+PawTrail 用来把 `conversations.json` 整理成可读、可检索、可审阅的记忆文件：把你和 AI 并肩走过的对话，整理成可回看的时间足迹。
 
 ## 快速使用
 1. 打开 `docs/index.html`（或本地 `ui_index.html`）。
