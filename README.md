@@ -1,4 +1,4 @@
-# PawTrail Archive Tool v0.1
+# PawTrail Archive Tool v1.0.0
 
 PawTrail 用来把OpenAI 导出的对话 JSON 整理成可读、可检索、可审阅的记忆文件。
 
