@@ -619,22 +619,61 @@
       return normalizeTimestamp(rawTs);
     }
 
-    function getLatestSubtreeTimestamp(nodeId, mapping, cache, stack) {
+    function getLatestSubtreeTimestamp(nodeId, mapping, cache) {
       if (!nodeId || !mapping[nodeId]) return 0;
       if (cache[nodeId] !== undefined) return cache[nodeId];
-      if (stack.has(nodeId)) return getNodeMessageTimestamp(mapping[nodeId]);
-      stack.add(nodeId);
-      const node = mapping[nodeId];
-      let bestTs = getNodeMessageTimestamp(node);
-      const children = (node && node.children) ? node.children : [];
-      for (let i = 0; i < children.length; i += 1) {
-        const childId = children[i];
-        const childTs = getLatestSubtreeTimestamp(childId, mapping, cache, stack);
-        if (childTs > bestTs) bestTs = childTs;
+
+      const visiting = new Set();
+      const stack = [{ id: nodeId, phase: 0 }];
+
+      while (stack.length) {
+        const frame = stack[stack.length - 1];
+        const id = frame.id;
+        const node = mapping[id];
+
+        if (!id || !node) {
+          stack.pop();
+          continue;
+        }
+
+        if (cache[id] !== undefined) {
+          stack.pop();
+          continue;
+        }
+
+        if (frame.phase === 0) {
+          if (visiting.has(id)) {
+            // Fallback for malformed cyclic mappings.
+            cache[id] = getNodeMessageTimestamp(node);
+            stack.pop();
+            continue;
+          }
+          visiting.add(id);
+          frame.phase = 1;
+          const children = (node && node.children) ? node.children : [];
+          for (let i = children.length - 1; i >= 0; i -= 1) {
+            const childId = children[i];
+            if (!mapping[childId] || cache[childId] !== undefined) continue;
+            stack.push({ id: childId, phase: 0 });
+          }
+          continue;
+        }
+
+        let bestTs = getNodeMessageTimestamp(node);
+        const children = (node && node.children) ? node.children : [];
+        for (let i = 0; i < children.length; i += 1) {
+          const childId = children[i];
+          const childTs = cache[childId] !== undefined
+            ? cache[childId]
+            : (mapping[childId] ? getNodeMessageTimestamp(mapping[childId]) : 0);
+          if (childTs > bestTs) bestTs = childTs;
+        }
+        cache[id] = bestTs;
+        visiting.delete(id);
+        stack.pop();
       }
-      stack.delete(nodeId);
-      cache[nodeId] = bestTs;
-      return bestTs;
+
+      return cache[nodeId] || 0;
     }
 
     function linearizeConversation(conv) {
@@ -665,7 +704,6 @@
         }) || allIds[0];
         const visited = new Set();
         const cache = {};
-        const stack = new Set();
         let nodeId = rootId;
 
         while (nodeId && !visited.has(nodeId) && mapping[nodeId]) {
@@ -680,7 +718,7 @@
           for (let i = 0; i < children.length; i += 1) {
             const childId = children[i];
             if (!mapping[childId]) continue;
-            const childTs = getLatestSubtreeTimestamp(childId, mapping, cache, stack);
+            const childTs = getLatestSubtreeTimestamp(childId, mapping, cache);
             if (nextId === null || childTs > bestTs) {
               nextId = childId;
               bestTs = childTs;
