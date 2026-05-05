@@ -460,13 +460,14 @@
         <div class="help-note">可以直接上传解压后的 conversations.json；如果用户手里只有 ChatGPT 导出的 zip，也可以直接上传。超大 JSON 会自动用流式解析。</div>
       </div>
       <div class="field">
-        <label>ChatGPT 分支处理</label>
+        <label>ChatGPT 编辑 / 分支处理</label>
         <select id="branchMode">
-          <option value="active" selected>当前分支（默认）</option>
-          <option value="latest">时间最新分支</option>
-          <option value="all">全部分支（会保留重复祖先消息）</option>
+          <option value="edits" selected>当前版本 + 编辑记录（推荐）</option>
+          <option value="active">只看当前版本</option>
+          <option value="latest">只看时间最新版本</option>
+          <option value="all">全部版本（编辑记录 + 重新生成）</option>
         </select>
-        <div class="help-note">分支信息来自 conversations.json 里的 mapping / current_node / children，不需要额外上传 zip。</div>
+        <div class="help-note">点“编辑”改过某句消息时，旧版和新版会在同一窗口里形成版本记录；推荐模式会自动带出这些编辑版本。信息来自 conversations.json，不需要额外上传 zip。</div>
       </div>
       <div class="row">
         <button class="btn" id="parseBtn">解析并加载</button>
@@ -893,6 +894,56 @@
       return paths;
     }
 
+    function getNodeRole(mapping, nodeId) {
+      const node = mapping[nodeId] || {};
+      const msg = node.message || {};
+      return (msg.author && msg.author.role) || msg.role || '';
+    }
+
+    function getSiblingChoiceIds(mapping, nodeId, role) {
+      const node = mapping[nodeId] || {};
+      const parentId = node.parent;
+      const parent = parentId ? mapping[parentId] : null;
+      if (!parent) return [];
+      return ((parent.children || []) || []).filter(childId => {
+        if (!mapping[childId]) return false;
+        if (role) return getNodeRole(mapping, childId) === role;
+        return true;
+      });
+    }
+
+    function getPathVersionEvents(mapping, pathIds) {
+      const events = [];
+      pathIds.forEach((nodeId, idx) => {
+        const role = getNodeRole(mapping, nodeId);
+        if (role !== 'user' && role !== 'assistant') return;
+        const choices = getSiblingChoiceIds(mapping, nodeId, role);
+        if (choices.length < 2) return;
+        events.push({
+          type: role === 'user' ? 'edit' : 'regenerate',
+          node_id: nodeId,
+          parent_node: (mapping[nodeId] || {}).parent || '',
+          choice_count: choices.length,
+          choice_index: Math.max(0, choices.indexOf(nodeId)) + 1,
+          message_index: idx
+        });
+      });
+      return events;
+    }
+
+    function pathHasUserEdit(mapping, pathIds) {
+      return getPathVersionEvents(mapping, pathIds).some(item => item.type === 'edit');
+    }
+
+    function collectEditedBranchPaths(mapping, currentPath) {
+      const paths = collectLeafBranchPaths(mapping).filter(path => pathHasUserEdit(mapping, path));
+      const currentKey = (currentPath || []).join('/');
+      if (currentKey && pathHasUserEdit(mapping, currentPath) && !paths.some(path => path.join('/') === currentKey)) {
+        paths.push(currentPath);
+      }
+      return paths.length ? paths : [(currentPath || []).length ? currentPath : collectLatestBranchPath(mapping)];
+    }
+
     function pathToMessages(mapping, pathIds) {
       const out = [];
       for (let i = 0; i < pathIds.length; i += 1) {
@@ -914,14 +965,50 @@
       return text || fallback || 'item';
     }
 
-    function buildBranchRecord(conv, pathIds, index, isCurrent) {
+    function firstPathDifference(pathIds, currentPath) {
+      const maxLen = Math.max(pathIds.length, currentPath.length);
+      for (let i = 0; i < maxLen; i += 1) {
+        if (pathIds[i] !== currentPath[i]) return i;
+      }
+      return -1;
+    }
+
+    function buildBranchRecord(conv, pathIds, index, isCurrent, mapping, currentPath) {
       const leafId = pathIds[pathIds.length - 1] || '';
       const convId = conv.id || conv.conversation_id || conv.title || 'conversation';
-      const branchLabel = isCurrent ? 'current' : `alternate-${String(index).padStart(3, '0')}`;
+      const versionEvents = mapping ? getPathVersionEvents(mapping, pathIds) : [];
+      const editEvents = versionEvents.filter(item => item.type === 'edit');
+      const regenerateEvents = versionEvents.filter(item => item.type === 'regenerate');
+      const diffIndex = currentPath && currentPath.length ? firstPathDifference(pathIds, currentPath) : -1;
+      const divergenceNode = diffIndex >= 0 ? pathIds[diffIndex] : '';
+      const divergenceRole = divergenceNode && mapping ? getNodeRole(mapping, divergenceNode) : '';
+      let branchKind = 'branch';
+      if (isCurrent) branchKind = editEvents.length ? 'current_edit' : 'current';
+      else if (divergenceRole === 'user') branchKind = 'edit';
+      else if (divergenceRole === 'assistant') branchKind = 'regenerate';
+      else if (editEvents.length) branchKind = 'edit';
+      else if (regenerateEvents.length) branchKind = 'regenerate';
+
+      const serial = String(index).padStart(3, '0');
+      const branchLabel = isCurrent
+        ? 'current'
+        : (branchKind === 'edit' ? `edit-${serial}` : (branchKind === 'regenerate' ? `regenerate-${serial}` : `alternate-${serial}`));
+      const displayLabel = isCurrent
+        ? (branchKind === 'current_edit' ? '当前编辑版本' : '当前版本')
+        : (branchKind === 'edit' ? `编辑版本-${serial}` : (branchKind === 'regenerate' ? `重新生成-${serial}` : `分支-${serial}`));
       return {
-        branch_id: `${slugifySourceToken(convId, 'conversation')}__b${String(index).padStart(3, '0')}__${slugifySourceToken(String(leafId).slice(0, 12), 'leaf')}`,
+        branch_id: `${slugifySourceToken(convId, 'conversation')}__b${serial}__${slugifySourceToken(String(leafId).slice(0, 12), 'leaf')}`,
         branch_label: branchLabel,
+        display_label: displayLabel,
+        branch_kind: branchKind,
         leaf_node: leafId,
+        divergence_node: divergenceNode,
+        divergence_parent: divergenceNode && mapping && mapping[divergenceNode] ? (mapping[divergenceNode].parent || '') : '',
+        divergence_message_index: diffIndex,
+        edit_count: editEvents.length,
+        regenerate_count: regenerateEvents.length,
+        edit_nodes: editEvents.map(item => item.node_id),
+        regenerate_nodes: regenerateEvents.map(item => item.node_id),
         is_current_branch: Boolean(isCurrent),
         node_path: pathIds.slice(),
         node_count: pathIds.length
@@ -941,6 +1028,8 @@
         paths = collectLeafBranchPaths(mapping);
         const currentKey = currentPath.join('/');
         if (currentPath.length && !paths.some(path => path.join('/') === currentKey)) paths.push(currentPath);
+      } else if (branchMode === 'edits') {
+        paths = collectEditedBranchPaths(mapping, currentPath);
       } else if (branchMode === 'latest') {
         paths = [latestPath];
       } else {
@@ -953,7 +1042,7 @@
         const key = path.join('/');
         if (seen.has(key)) return null;
         seen.add(key);
-        const branch = buildBranchRecord(conv, path, idx + 1, Boolean(currentKey && key === currentKey));
+        const branch = buildBranchRecord(conv, path, idx + 1, Boolean(currentKey && key === currentKey), mapping, currentPath);
         const messages = pathToMessages(mapping, path);
         return messages.length ? { messages, branch } : null;
       }).filter(Boolean);
@@ -974,10 +1063,12 @@
         const branches = c.mapping ? linearizeConversationBranches(c, branchMode) : linearizeConversationBranches(c, 'active');
         branches.forEach((item, branchIdx) => {
           const branch = item.branch || {};
-          const suffix = branchMode === 'all' && branch.branch_label ? ` [${branch.branch_label}]` : '';
+          const suffix = (branchMode === 'all' || branchMode === 'edits') && (branch.display_label || branch.branch_label)
+            ? ` [${branch.display_label || branch.branch_label}]`
+            : '';
           const idSuffix = branch.branch_id ? `-${branch.branch_id}` : `-${branchIdx}`;
           all.push({
-            id: `${c.id || `conv-${i}`}${branchMode === 'all' ? idSuffix : ''}`,
+            id: `${c.id || `conv-${i}`}${(branchMode === 'all' || branchMode === 'edits') ? idSuffix : ''}`,
             title: `${c.title || 'Conversation'}${suffix}`,
             messages: item.messages,
             branch
@@ -1497,6 +1588,27 @@
       });
     }
 
+    function branchKindLabel(kind) {
+      if (kind === 'current_edit') return '当前编辑版本';
+      if (kind === 'current') return '当前版本';
+      if (kind === 'edit') return '编辑记录';
+      if (kind === 'regenerate') return '重新生成';
+      return '普通分支';
+    }
+
+    function appendBranchInfoLines(lines, conv) {
+      const branch = conv && conv.branch ? conv.branch : null;
+      if (!branch || !branch.branch_id) return;
+      const parts = [
+        `版本: ${branch.display_label || branch.branch_label || branch.branch_id}`,
+        `类型: ${branchKindLabel(branch.branch_kind)}`,
+        `当前版本: ${branch.is_current_branch ? '是' : '否'}`
+      ];
+      if (branch.edit_count) parts.push(`编辑记录数: ${branch.edit_count}`);
+      if (branch.regenerate_count) parts.push(`重新生成记录数: ${branch.regenerate_count}`);
+      lines.push(parts.join(' | '));
+    }
+
     function buildMarkdown(convs, month, includeAnchors) {
       const lines = [];
       let msgIndex = 0;
@@ -1505,6 +1617,7 @@
         lines.push('');
         lines.push(`## ${conv.title}`);
         lines.push(`范围: ${formatDate(conv.range.start)} ~ ${formatDate(conv.range.end)} | 消息数: ${conv.count}`);
+        appendBranchInfoLines(lines, conv);
         conv.messages.filter(m => m.content).forEach(m => {
           msgIndex += 1;
           lines.push('');
@@ -1634,12 +1747,19 @@
       if (withFrontmatter) {
         const startDate = conv.range && conv.range.start ? formatDate(conv.range.start) : '';
         const endDate = conv.range && conv.range.end ? formatDate(conv.range.end) : '';
+        const branch = conv.branch || {};
         lines.push('---');
         if (startDate && endDate && startDate !== endDate) lines.push(`date_range: "${startDate}~${endDate}"`);
         else if (startDate) lines.push(`date: ${startDate}`);
         lines.push('source: "pawtrail-archive"');
         if (opts.sessionId) lines.push(`session_id: "${escapeMarkerValue(opts.sessionId)}"`);
         lines.push(`thread_id: "${escapeMarkerValue(String(conv.id || ''))}"`);
+        if (branch.branch_id) {
+          lines.push(`branch_id: "${escapeMarkerValue(branch.branch_id)}"`);
+          lines.push(`branch_label: "${escapeMarkerValue(branch.display_label || branch.branch_label || '')}"`);
+          lines.push(`branch_kind: "${escapeMarkerValue(branch.branch_kind || '')}"`);
+          lines.push(`is_current_branch: ${branch.is_current_branch ? 'true' : 'false'}`);
+        }
         if (withFrontmatterIndexId && segments.length) {
           lines.push(`index_id: "${escapeMarkerValue(segments[0].index_id || segments[0].topic_id || '')}"`);
           lines.push(`topic: "${escapeMarkerValue(segments[0].topic_title || '')}"`);
@@ -1650,6 +1770,7 @@
 
       lines.push(`# ${conv.title}`);
       lines.push(`范围: ${formatDate(conv.range.start)} ~ ${formatDate(conv.range.end)} | 消息数: ${conv.count}`);
+      appendBranchInfoLines(lines, conv);
 
       let msgIndex = 0;
       let segCursor = 0;
@@ -2808,7 +2929,15 @@
         renderMonths();
         renderWindows();
         renderPreview();
-        setStatusMessage(status, 'success', `加载完成：${allConversations.length} 个窗口/分支`);
+        const editVersionCount = allConversations.filter(c => {
+          const kind = c.branch && c.branch.branch_kind;
+          return kind === 'edit' || kind === 'current_edit';
+        }).length;
+        const regenerateVersionCount = allConversations.filter(c => c.branch && c.branch.branch_kind === 'regenerate').length;
+        const versionNote = editVersionCount || regenerateVersionCount
+          ? `（编辑版本 ${editVersionCount}，重新生成 ${regenerateVersionCount}）`
+          : '';
+        setStatusMessage(status, 'success', `加载完成：${allConversations.length} 个窗口/版本${versionNote}`);
       } catch (e) {
         console.error(e);
         setStatusMessage(status, 'error', describeImportError(e, file));

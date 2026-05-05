@@ -210,6 +210,63 @@ def collect_leaf_branch_paths(mapping):
     return paths
 
 
+def get_node_role(mapping, node_id):
+    node = mapping.get(node_id) or {}
+    msg = node.get("message") or {}
+    return (msg.get("author", {}) or {}).get("role") or msg.get("role") or ""
+
+
+def get_sibling_choice_ids(mapping, node_id, role=None):
+    node = mapping.get(node_id) or {}
+    parent_id = node.get("parent")
+    parent = mapping.get(parent_id) if parent_id else None
+    if not parent:
+        return []
+    out = []
+    for child_id in parent.get("children", []) or []:
+        if child_id not in mapping:
+            continue
+        if role and get_node_role(mapping, child_id) != role:
+            continue
+        out.append(child_id)
+    return out
+
+
+def get_path_version_events(mapping, path_ids):
+    events = []
+    for index, node_id in enumerate(path_ids or []):
+        role = get_node_role(mapping, node_id)
+        if role not in {"user", "assistant"}:
+            continue
+        choices = get_sibling_choice_ids(mapping, node_id, role=role)
+        if len(choices) < 2:
+            continue
+        events.append({
+            "type": "edit" if role == "user" else "regenerate",
+            "node_id": node_id,
+            "parent_node": (mapping.get(node_id) or {}).get("parent") or "",
+            "choice_count": len(choices),
+            "choice_index": (choices.index(node_id) + 1) if node_id in choices else 0,
+            "message_index": index,
+        })
+    return events
+
+
+def path_has_user_edit(mapping, path_ids):
+    return any(item.get("type") == "edit" for item in get_path_version_events(mapping, path_ids))
+
+
+def collect_edited_branch_paths(mapping, current_path):
+    paths = [path for path in collect_leaf_branch_paths(mapping) if path_has_user_edit(mapping, path)]
+    current_key = tuple(current_path or [])
+    if current_key and path_has_user_edit(mapping, current_path):
+        if current_key not in {tuple(path) for path in paths}:
+            paths.append(current_path)
+    if paths:
+        return paths
+    return [current_path or collect_latest_branch_path(mapping)]
+
+
 def path_to_messages(mapping, path_ids):
     out = []
     for pid in path_ids:
@@ -223,14 +280,68 @@ def path_to_messages(mapping, path_ids):
     return out
 
 
-def build_branch_record(conv, path_ids, index, is_current):
+def first_path_difference(path_ids, current_path):
+    max_len = max(len(path_ids or []), len(current_path or []))
+    for index in range(max_len):
+        left = path_ids[index] if index < len(path_ids or []) else None
+        right = current_path[index] if index < len(current_path or []) else None
+        if left != right:
+            return index
+    return -1
+
+
+def build_branch_record(conv, path_ids, index, is_current, mapping=None, current_path=None):
     leaf_id = path_ids[-1] if path_ids else ""
     conv_id = conv.get("id") or conv.get("conversation_id") or conv.get("title") or "conversation"
-    branch_label = "current" if is_current else f"alternate-{index:03d}"
+    version_events = get_path_version_events(mapping or {}, path_ids or []) if mapping else []
+    edit_events = [item for item in version_events if item.get("type") == "edit"]
+    regenerate_events = [item for item in version_events if item.get("type") == "regenerate"]
+    diff_index = first_path_difference(path_ids or [], current_path or [])
+    divergence_node = path_ids[diff_index] if diff_index >= 0 and diff_index < len(path_ids or []) else ""
+    divergence_role = get_node_role(mapping or {}, divergence_node) if divergence_node and mapping else ""
+    branch_kind = "branch"
+    if is_current:
+        branch_kind = "current_edit" if edit_events else "current"
+    elif divergence_role == "user":
+        branch_kind = "edit"
+    elif divergence_role == "assistant":
+        branch_kind = "regenerate"
+    elif edit_events:
+        branch_kind = "edit"
+    elif regenerate_events:
+        branch_kind = "regenerate"
+
+    if is_current:
+        branch_label = "current"
+    elif branch_kind == "edit":
+        branch_label = f"edit-{index:03d}"
+    elif branch_kind == "regenerate":
+        branch_label = f"regenerate-{index:03d}"
+    else:
+        branch_label = f"alternate-{index:03d}"
+
+    if is_current:
+        display_label = "当前编辑版本" if branch_kind == "current_edit" else "当前版本"
+    elif branch_kind == "edit":
+        display_label = f"编辑版本-{index:03d}"
+    elif branch_kind == "regenerate":
+        display_label = f"重新生成-{index:03d}"
+    else:
+        display_label = f"分支-{index:03d}"
+
     return {
         "branch_id": f"{safe_slug(conv_id, 'conversation')}__b{index:03d}__{safe_slug(str(leaf_id)[:12], 'leaf')}",
         "branch_label": branch_label,
+        "display_label": display_label,
+        "branch_kind": branch_kind,
         "leaf_node": leaf_id,
+        "divergence_node": divergence_node,
+        "divergence_parent": (mapping.get(divergence_node) or {}).get("parent", "") if divergence_node and mapping else "",
+        "divergence_message_index": diff_index,
+        "edit_count": len(edit_events),
+        "regenerate_count": len(regenerate_events),
+        "edit_nodes": [item.get("node_id") for item in edit_events],
+        "regenerate_nodes": [item.get("node_id") for item in regenerate_events],
         "is_current_branch": bool(is_current),
         "node_path": path_ids,
         "node_count": len(path_ids)
@@ -261,6 +372,8 @@ def iter_conversation_branches(conv, branch_mode="active"):
         paths = collect_leaf_branch_paths(mapping)
         if current_path and tuple(current_path) not in {tuple(path) for path in paths}:
             paths.append(current_path)
+    elif branch_mode == "edits":
+        paths = collect_edited_branch_paths(mapping, current_path)
     elif branch_mode == "latest":
         paths = [latest_path]
     else:
@@ -278,7 +391,7 @@ def iter_conversation_branches(conv, branch_mode="active"):
     current_key = tuple(current_path or [])
     for index, path in enumerate(clean_paths, start=1):
         is_current = bool(current_key and tuple(path) == current_key)
-        record = build_branch_record(conv, path, index, is_current)
+        record = build_branch_record(conv, path, index, is_current, mapping=mapping, current_path=current_path)
         record["messages"] = path_to_messages(mapping, path)
         if record["messages"]:
             yield record
@@ -306,8 +419,8 @@ def parse_openai_conversations(obj, branch_mode="active"):
             if not messages:
                 continue
             title = conv.get("title") or "Conversation"
-            if branch.get("branch_label") and branch_mode == "all":
-                title = f"{title} [{branch.get('branch_label')}]"
+            if branch.get("branch_label") and branch_mode in {"all", "edits"}:
+                title = f"{title} [{branch.get('display_label') or branch.get('branch_label')}]"
             yield {
                 "id": conv.get("id") or conv.get("conversation_id") or "",
                 "title": title,
@@ -315,7 +428,16 @@ def parse_openai_conversations(obj, branch_mode="active"):
                 "branch": {
                     "branch_id": branch.get("branch_id", ""),
                     "branch_label": branch.get("branch_label", ""),
+                    "display_label": branch.get("display_label", ""),
+                    "branch_kind": branch.get("branch_kind", ""),
                     "leaf_node": branch.get("leaf_node", ""),
+                    "divergence_node": branch.get("divergence_node", ""),
+                    "divergence_parent": branch.get("divergence_parent", ""),
+                    "divergence_message_index": branch.get("divergence_message_index", -1),
+                    "edit_count": branch.get("edit_count", 0),
+                    "regenerate_count": branch.get("regenerate_count", 0),
+                    "edit_nodes": branch.get("edit_nodes", []),
+                    "regenerate_nodes": branch.get("regenerate_nodes", []),
                     "is_current_branch": branch.get("is_current_branch", False),
                     "node_path": branch.get("node_path", []),
                     "node_count": branch.get("node_count", 0),
@@ -430,7 +552,16 @@ def write_branch_manifest_row(writer, conv):
         "title": conv.get("title", ""),
         "branch_id": branch.get("branch_id", ""),
         "branch_label": branch.get("branch_label", ""),
+        "display_label": branch.get("display_label", ""),
+        "branch_kind": branch.get("branch_kind", ""),
         "leaf_node": branch.get("leaf_node", ""),
+        "divergence_node": branch.get("divergence_node", ""),
+        "divergence_parent": branch.get("divergence_parent", ""),
+        "divergence_message_index": branch.get("divergence_message_index", -1),
+        "edit_count": branch.get("edit_count", 0),
+        "regenerate_count": branch.get("regenerate_count", 0),
+        "edit_nodes": branch.get("edit_nodes", []),
+        "regenerate_nodes": branch.get("regenerate_nodes", []),
         "is_current_branch": branch.get("is_current_branch", False),
         "message_count": branch.get("message_count", 0),
         "node_count": branch.get("node_count", 0),
@@ -462,7 +593,7 @@ def write_by_day_raw(conversations_iter, out_root, write_manifest=True, include_
                     role = m.get("role")
                     branch = conv.get("branch") or {}
                     if include_branch_labels and branch.get("branch_id"):
-                        role = f"{role} [{branch.get('branch_label') or branch.get('branch_id')}]"
+                        role = f"{role} [{branch.get('display_label') or branch.get('branch_label') or branch.get('branch_id')}]"
                     line = f"{ts}\t[{to_iso(ts)}] {role}: {content}\n"
                     w.write(line)
                 count += 1
@@ -623,7 +754,7 @@ def main():
     parser.add_argument("--month", default=None, help="month key for split-topics, e.g. 2026-01")
     parser.add_argument("--topics-file", default=None, help="path to .topics.md for split-topics")
     parser.add_argument("--gap-hours", type=int, default=4, help="topic boundary gap in hours")
-    parser.add_argument("--branch-mode", default="active", choices=["active", "latest", "all"], help="OpenAI mapping branch handling")
+    parser.add_argument("--branch-mode", default="active", choices=["active", "latest", "edits", "all"], help="OpenAI mapping branch handling")
     args = parser.parse_args()
 
     ensure_dir(args.out)
@@ -635,7 +766,7 @@ def main():
             count, branch_count = write_by_day_raw(
                 conv_iter,
                 args.out,
-                include_branch_labels=args.branch_mode == "all"
+                include_branch_labels=args.branch_mode in {"edits", "all"}
             )
         except Exception as stream_error:
             if input_payload_size(args.input) >= LARGE_INPUT_FALLBACK_LIMIT:
@@ -645,7 +776,7 @@ def main():
             count, branch_count = write_by_day_raw(
                 conv_iter,
                 args.out,
-                include_branch_labels=args.branch_mode == "all"
+                include_branch_labels=args.branch_mode in {"edits", "all"}
             )
         build_month_files(args.out)
         build_topic_preview(args.out, gap_hours=args.gap_hours)
