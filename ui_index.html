@@ -140,6 +140,36 @@
       color: #667085;
       line-height: 1.45;
     }
+    .status-text {
+      margin-top: 8px;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-line;
+    }
+    .status-info {
+      color: var(--muted);
+    }
+    .status-busy {
+      color: #374151;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .status-success {
+      color: #166534;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .status-error {
+      color: #9f1239;
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
     .option-group {
       margin-top: 8px;
       border: 1px solid var(--border);
@@ -460,7 +490,7 @@
         <button class="btn ghost" id="clearSelectBtn">清空</button>
         <button class="btn ghost" id="exportMdBtn">导出勾选md</button>
       </div>
-      <div class="muted" id="status" style="margin-top:8px;"></div>
+      <div class="status-text status-info" id="status"></div>
     </section>
 
     <section class="panel">
@@ -607,6 +637,100 @@
       uidSeed: 1,
       sidecarMeta: {}
     };
+
+    function createImportError(code, message) {
+      const err = new Error(message);
+      err.code = code;
+      return err;
+    }
+
+    function setStatusMessage(statusEl, kind, message) {
+      if (!statusEl) return;
+      statusEl.className = `status-text status-${kind || 'info'}`;
+      statusEl.textContent = message || '';
+    }
+
+    function isJsonFile(file) {
+      const name = String(file && file.name || '').toLowerCase();
+      const type = String(file && file.type || '').toLowerCase();
+      return name.endsWith('.json') || type.includes('json');
+    }
+
+    function shortErrorDetail(text) {
+      const detail = String(text || '').replace(/\s+/g, ' ').trim();
+      return detail.length > 180 ? `${detail.slice(0, 180)}...` : detail;
+    }
+
+    function validateImportFile(file) {
+      if (!file) {
+        throw createImportError('NO_FILE', '还没有选择文件。');
+      }
+      if (Number(file.size || 0) <= 0) {
+        throw createImportError('EMPTY_FILE', '这个文件是空的。');
+      }
+      if (!isZipFile(file) && !isJsonFile(file)) {
+        throw createImportError('UNSUPPORTED_FILE', '文件类型不对。');
+      }
+      if (typeof TextDecoder === 'undefined') {
+        throw createImportError('BROWSER_UNSUPPORTED', '当前浏览器缺少读取大文件需要的能力。');
+      }
+      const needsStream = isZipFile(file) || Number(file.size || 0) >= STREAM_PARSE_THRESHOLD;
+      if (needsStream && (!file.stream || typeof file.stream !== 'function')) {
+        throw createImportError('BROWSER_UNSUPPORTED', '当前浏览器不支持大文件流式读取。');
+      }
+      if (isZipFile(file) && (!window.fflate || !window.fflate.Unzip)) {
+        throw createImportError('ZIP_MODULE_MISSING', 'ZIP 解析模块没有加载成功。');
+      }
+    }
+
+    function describeImportError(error, file) {
+      const raw = shortErrorDetail((error && error.message) || error);
+      const lower = raw.toLowerCase();
+      let reason = '没有成功读取这个文件。';
+      let action = '请重新选择 ChatGPT 导出里的 conversations.json，或直接选择 ChatGPT 原始导出的 zip。';
+
+      if (error && error.code === 'NO_FILE') {
+        reason = '还没有选择文件。';
+        action = '先点“上传 ChatGPT 导出文件”，再选择 conversations.json 或导出 zip。';
+      } else if (error && error.code === 'EMPTY_FILE') {
+        reason = '这个文件是空的。';
+        action = '请重新从 ChatGPT 导出数据，或确认文件没有被同步软件截断。';
+      } else if (error && error.code === 'UNSUPPORTED_FILE') {
+        reason = '文件类型不对。';
+        action = '这里需要 conversations.json，或者 ChatGPT 原始导出的 .zip。';
+      } else if (error && error.code === 'ZIP_MODULE_MISSING') {
+        reason = 'ZIP 解析模块没有加载成功。';
+        action = '请刷新页面后再试；如果网络拦截了 CDN，可以先解压 zip，再上传里面的 conversations.json。';
+      } else if (error && error.code === 'BROWSER_UNSUPPORTED') {
+        reason = '当前浏览器不支持这个大文件读取方式。';
+        action = '建议换 Chrome、Edge 或新版 Safari，再重新选择同一个文件。';
+      } else if (error && error.code === 'NO_CONVERSATIONS') {
+        reason = '文件读到了，但没有识别到 ChatGPT 对话记录。';
+        action = '请确认上传的是 ChatGPT 导出包里的 conversations.json，不是 message_feedback.json、model_comparisons.json 或其它文件。';
+      } else if (raw.includes('没有找到 conversations.json')) {
+        reason = '这个 zip 里没有找到 conversations.json。';
+        action = '请上传 ChatGPT 原始导出 zip，或者先解压后直接上传 conversations.json。';
+      } else if (error instanceof SyntaxError || lower.includes('unexpected token') || lower.includes('json')) {
+        reason = 'JSON 内容不完整或格式损坏。';
+        action = '请重新导出 / 重新下载文件；如果是 zip，试试先解压后上传 conversations.json。';
+      } else if (raw.includes('还没读完整') || lower.includes('unexpected end')) {
+        reason = '文件还没读完整，可能下载不完整或被截断。';
+        action = '请重新下载 ChatGPT 导出文件，确认文件大小稳定后再上传。';
+      } else if (raw.includes('数组项不是对象') || raw.includes('格式不符合预期')) {
+        reason = '这个 JSON 看起来不是 ChatGPT 的 conversations.json。';
+        action = '请回到 ChatGPT 导出包里，选择名字正好是 conversations.json 的文件。';
+      } else if (lower.includes('memory') || lower.includes('allocation') || lower.includes('maximum call stack')) {
+        reason = '浏览器内存不够，文件没有整理完。';
+        action = '请关闭其它标签页后重试；如果仍失败，换内存更大的电脑或浏览器再试。';
+      } else if (error && (error.name === 'NotReadableError' || error.name === 'AbortError')) {
+        reason = '浏览器没有读到这个本地文件。';
+        action = '请重新点上传选择文件；不要在解析过程中移动、删除或重命名它。';
+      }
+
+      const name = file && file.name ? `\n文件：${file.name}` : '';
+      const detail = raw && raw !== reason ? `\n排查细节：${raw}` : '';
+      return `解析失败：${reason}\n下一步：${action}${name}${detail}`;
+    }
 
     function normalizeTimestamp(ts) {
       if (!ts) return 0;
@@ -887,7 +1011,7 @@
 
     async function* textChunksFromZip(file, onProgress) {
       if (!window.fflate || !window.fflate.Unzip) {
-        throw new Error('ZIP 流式解析模块未加载，请检查网络后刷新页面。');
+        throw createImportError('ZIP_MODULE_MISSING', 'ZIP 流式解析模块未加载，请检查网络后刷新页面。');
       }
 
       const queue = [];
@@ -944,7 +1068,7 @@
           }
           unzip.push(new Uint8Array(0), true);
           if (!found) {
-            error = new Error('这个 zip 里没有找到 conversations.json。');
+            error = createImportError('ZIP_NO_CONVERSATIONS_JSON', '这个 zip 里没有找到 conversations.json。');
             wake();
           }
         } catch (err) {
@@ -1042,11 +1166,16 @@
     }
 
     async function parseOpenAIFile(file, branchMode, statusEl) {
+      validateImportFile(file);
       const useStream = isZipFile(file) || Number(file.size || 0) >= STREAM_PARSE_THRESHOLD;
       if (!useStream) {
         const text = await file.text();
         const json = JSON.parse(text);
-        return parseOpenAIJson(json, branchMode);
+        const parsed = parseOpenAIJson(json, branchMode);
+        if (!parsed.length) {
+          throw createImportError('NO_CONVERSATIONS', '没有识别到 ChatGPT 对话记录。');
+        }
+        return parsed;
       }
 
       const all = [];
@@ -1067,6 +1196,9 @@
           statusEl.textContent = `正在整理窗口：已识别 ${parsed} 个窗口 / ${all.length} 条分支`;
           await new Promise(resolve => setTimeout(resolve, 0));
         }
+      }
+      if (!all.length) {
+        throw createImportError('NO_CONVERSATIONS', '没有识别到 ChatGPT 对话记录。');
       }
       return all;
     }
@@ -2657,13 +2789,13 @@
     document.getElementById('parseBtn').addEventListener('click', async () => {
       const file = document.getElementById('convFile').files[0];
       const status = document.getElementById('status');
-      status.textContent = '';
+      setStatusMessage(status, 'info', '');
       if (!file) {
-        status.textContent = '请先上传 ChatGPT 导出文件';
+        setStatusMessage(status, 'error', describeImportError(createImportError('NO_FILE', '还没有选择文件。'), file));
         return;
       }
       try {
-        status.textContent = '正在解析…';
+        setStatusMessage(status, 'busy', '正在解析…');
         const branchMode = document.getElementById('branchMode').value || 'active';
         allConversations = await parseOpenAIFile(file, branchMode, status);
         monthIndex = buildMonthIndex(allConversations);
@@ -2676,9 +2808,10 @@
         renderMonths();
         renderWindows();
         renderPreview();
-        status.textContent = `加载完成：${allConversations.length} 个窗口/分支`;
+        setStatusMessage(status, 'success', `加载完成：${allConversations.length} 个窗口/分支`);
       } catch (e) {
-        status.textContent = '解析失败：' + e.message;
+        console.error(e);
+        setStatusMessage(status, 'error', describeImportError(e, file));
       }
     });
 
@@ -2691,7 +2824,7 @@
       document.getElementById('monthList').textContent = '未加载';
       document.getElementById('windowList').textContent = '请选择月份';
       document.getElementById('previewPane').textContent = '等待加载';
-      document.getElementById('status').textContent = '';
+      setStatusMessage(document.getElementById('status'), 'info', '');
       document.getElementById('searchInput').value = '';
       document.getElementById('searchScope').value = 'selected';
       setSearchStatus('');
