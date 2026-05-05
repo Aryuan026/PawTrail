@@ -425,8 +425,18 @@
     <section class="panel">
       <h2>数据加载</h2>
       <div class="field">
-        <label>上传 conversations.json</label>
-        <input id="convFile" type="file" accept="application/json,.json" />
+        <label>上传 ChatGPT 导出文件</label>
+        <input id="convFile" type="file" accept="application/json,application/zip,.json,.zip" />
+        <div class="help-note">可以直接上传解压后的 conversations.json；如果用户手里只有 ChatGPT 导出的 zip，也可以直接上传。900MB 级 JSON 会自动用流式解析。</div>
+      </div>
+      <div class="field">
+        <label>ChatGPT 分支处理</label>
+        <select id="branchMode">
+          <option value="active" selected>当前分支（默认）</option>
+          <option value="latest">时间最新分支</option>
+          <option value="all">全部分支（会保留重复祖先消息）</option>
+        </select>
+        <div class="help-note">分支信息来自 conversations.json 里的 mapping / current_node / children，不需要额外上传 zip。</div>
       </div>
       <div class="row">
         <button class="btn" id="parseBtn">解析并加载</button>
@@ -565,15 +575,17 @@
     </section>
   </main>
   <footer>
-    PawTrail 说明：大文件解析会稍慢，建议先按月份筛选，再分批导出与审阅。
+    PawTrail 说明：几百 MB 到 900MB 的 conversations.json 会自动进入流式解析；解析完成后再按月份筛选、分批导出与审阅。
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
   <script>
     let allConversations = [];
     let monthIndex = {};
     let selectedMonth = null;
     let selectedConvIds = new Set();
+    const STREAM_PARSE_THRESHOLD = 50 * 1024 * 1024;
     const SEARCH_MAX_WINDOWS = 200;
     const SEARCH_MAX_MESSAGES = 1200;
     let searchState = {
@@ -601,15 +613,27 @@
       return ts > 1e12 ? Math.floor(ts / 1000) : ts;
     }
 
-    function normalizeMessage(msg) {
+    function extractTextContent(content) {
+      if (content && Array.isArray(content.parts)) {
+        return content.parts.map(part => {
+          if (typeof part === 'string') return part;
+          if (part && typeof part === 'object') return part.text || part.content || part.name || '';
+          return '';
+        }).filter(Boolean).join('\n');
+      }
+      if (typeof content === 'string') return content;
+      if (content && typeof content.text === 'string') return content.text;
+      return '';
+    }
+
+    function normalizeMessage(msg, nodeId) {
       const role = (msg && msg.author && msg.author.role) || (msg && msg.role) || 'assistant';
-      let content = '';
-      if (msg && msg.content && msg.content.parts) content = msg.content.parts.join('\n');
-      else if (msg && typeof msg.content === 'string') content = msg.content;
-      else if (msg && msg.content && msg.content.text) content = msg.content.text;
+      const content = extractTextContent(msg && msg.content);
       const ts = msg && msg.create_time ? msg.create_time : (msg && msg.metadata && (msg.metadata.timestamp || msg.metadata.timestamp_)) || 0;
       const trimmed = content ? content.trim() : '';
-      return { role, content: trimmed, ts: normalizeTimestamp(ts) };
+      const out = { role, content: trimmed, ts: normalizeTimestamp(ts) };
+      if (nodeId) out.nodeId = nodeId;
+      return out;
     }
 
     function getNodeMessageTimestamp(node) {
@@ -676,90 +700,374 @@
       return cache[nodeId] || 0;
     }
 
-    function linearizeConversation(conv) {
-      if (!conv || !conv.mapping) return [];
-      const mapping = conv.mapping;
-
-      function collectPathFromCurrentNode() {
-        if (!conv.current_node || !mapping[conv.current_node]) return [];
-        const ids = [];
-        const seen = new Set();
-        let nodeId = conv.current_node;
-        while (nodeId && !seen.has(nodeId) && mapping[nodeId]) {
-          seen.add(nodeId);
-          ids.push(nodeId);
-          nodeId = mapping[nodeId].parent;
-        }
-        ids.reverse();
-        return ids;
-      }
-
-      function collectLatestBranchPath() {
-        const ids = [];
-        const allIds = Object.keys(mapping);
-        if (!allIds.length) return ids;
-        const rootId = allIds.find(id => {
-          const parentId = mapping[id] && mapping[id].parent;
-          return parentId === null || !mapping[parentId];
-        }) || allIds[0];
-        const visited = new Set();
-        const cache = {};
-        let nodeId = rootId;
-
-        while (nodeId && !visited.has(nodeId) && mapping[nodeId]) {
-          visited.add(nodeId);
-          ids.push(nodeId);
-          const node = mapping[nodeId];
-          const children = (node && node.children) ? node.children : [];
-          if (!children.length) break;
-
-          let nextId = null;
-          let bestTs = -1;
-          for (let i = 0; i < children.length; i += 1) {
-            const childId = children[i];
-            if (!mapping[childId]) continue;
-            const childTs = getLatestSubtreeTimestamp(childId, mapping, cache);
-            if (nextId === null || childTs > bestTs) {
-              nextId = childId;
-              bestTs = childTs;
-            }
-          }
-          if (!nextId) break;
-          nodeId = nextId;
-        }
-        return ids;
-      }
-
-      function pathToMessages(pathIds) {
-        const out = [];
-        for (let i = 0; i < pathIds.length; i += 1) {
-          const node = mapping[pathIds[i]];
-          if (!node || !node.message) continue;
-          const m = normalizeMessage(node.message);
-          if (m.content) out.push(m);
-        }
-        return out;
-      }
-
-      const primaryMsgs = pathToMessages(collectPathFromCurrentNode());
-      const fallbackMsgs = pathToMessages(collectLatestBranchPath());
-      if (!primaryMsgs.length) return fallbackMsgs;
-      if (primaryMsgs.length < fallbackMsgs.length) return fallbackMsgs;
-      return primaryMsgs;
+    function findRootIds(mapping) {
+      const roots = Object.keys(mapping || {}).filter(id => {
+        const parentId = mapping[id] && mapping[id].parent;
+        return parentId === null || !mapping[parentId];
+      });
+      return roots.length ? roots : Object.keys(mapping || {}).slice(0, 1);
     }
 
-    function parseOpenAIJson(json) {
+    function collectPathToRoot(mapping, nodeId) {
+      if (!nodeId || !mapping[nodeId]) return [];
+      const ids = [];
+      const seen = new Set();
+      while (nodeId && !seen.has(nodeId) && mapping[nodeId]) {
+        seen.add(nodeId);
+        ids.push(nodeId);
+        nodeId = mapping[nodeId].parent;
+      }
+      ids.reverse();
+      return ids;
+    }
+
+    function collectLatestBranchPath(mapping) {
+      const ids = [];
+      const allIds = Object.keys(mapping || {});
+      if (!allIds.length) return ids;
+      const cache = {};
+      const rootIds = findRootIds(mapping);
+      let rootId = rootIds[0];
+      rootIds.forEach(id => {
+        if (getLatestSubtreeTimestamp(id, mapping, cache) > getLatestSubtreeTimestamp(rootId, mapping, cache)) rootId = id;
+      });
+      const visited = new Set();
+      let nodeId = rootId;
+
+      while (nodeId && !visited.has(nodeId) && mapping[nodeId]) {
+        visited.add(nodeId);
+        ids.push(nodeId);
+        const node = mapping[nodeId];
+        const children = ((node && node.children) ? node.children : []).filter(childId => mapping[childId]);
+        if (!children.length) break;
+        let nextId = children[0];
+        children.forEach(childId => {
+          if (getLatestSubtreeTimestamp(childId, mapping, cache) > getLatestSubtreeTimestamp(nextId, mapping, cache)) nextId = childId;
+        });
+        nodeId = nextId;
+      }
+      return ids;
+    }
+
+    function collectLeafBranchPaths(mapping) {
+      const cache = {};
+      const paths = [];
+      const stack = findRootIds(mapping).reverse().map(rootId => ({ nodeId: rootId, path: [rootId] }));
+      while (stack.length) {
+        const item = stack.pop();
+        const node = mapping[item.nodeId] || {};
+        const children = ((node && node.children) ? node.children : [])
+          .filter(childId => mapping[childId] && !item.path.includes(childId));
+        if (!children.length) {
+          paths.push(item.path);
+          continue;
+        }
+        children
+          .sort((a, b) => getLatestSubtreeTimestamp(b, mapping, cache) - getLatestSubtreeTimestamp(a, mapping, cache))
+          .forEach(childId => stack.push({ nodeId: childId, path: item.path.concat(childId) }));
+      }
+      return paths;
+    }
+
+    function pathToMessages(mapping, pathIds) {
+      const out = [];
+      for (let i = 0; i < pathIds.length; i += 1) {
+        const node = mapping[pathIds[i]];
+        if (!node || !node.message) continue;
+        const m = normalizeMessage(node.message, pathIds[i]);
+        if (m.content) out.push(m);
+      }
+      return out;
+    }
+
+    function slugifySourceToken(raw, fallback) {
+      const text = String(raw || '').trim()
+        .replace(/\s+/g, '_')
+        .replace(/[^\w\u4e00-\u9fa5-]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 80);
+      return text || fallback || 'item';
+    }
+
+    function buildBranchRecord(conv, pathIds, index, isCurrent) {
+      const leafId = pathIds[pathIds.length - 1] || '';
+      const convId = conv.id || conv.conversation_id || conv.title || 'conversation';
+      const branchLabel = isCurrent ? 'current' : `alternate-${String(index).padStart(3, '0')}`;
+      return {
+        branch_id: `${slugifySourceToken(convId, 'conversation')}__b${String(index).padStart(3, '0')}__${slugifySourceToken(String(leafId).slice(0, 12), 'leaf')}`,
+        branch_label: branchLabel,
+        leaf_node: leafId,
+        is_current_branch: Boolean(isCurrent),
+        node_path: pathIds.slice(),
+        node_count: pathIds.length
+      };
+    }
+
+    function linearizeConversationBranches(conv, branchMode) {
+      if (!conv || !conv.mapping) {
+        const messages = ((conv && conv.messages) || []).map(msg => normalizeMessage(msg)).filter(m => m.content);
+        return messages.length ? [{ messages, branch: null }] : [];
+      }
+      const mapping = conv.mapping;
+      const currentPath = collectPathToRoot(mapping, conv.current_node);
+      const latestPath = collectLatestBranchPath(mapping);
+      let paths = [];
+      if (branchMode === 'all') {
+        paths = collectLeafBranchPaths(mapping);
+        const currentKey = currentPath.join('/');
+        if (currentPath.length && !paths.some(path => path.join('/') === currentKey)) paths.push(currentPath);
+      } else if (branchMode === 'latest') {
+        paths = [latestPath];
+      } else {
+        paths = [currentPath.length ? currentPath : latestPath];
+      }
+
+      const currentKey = currentPath.join('/');
+      const seen = new Set();
+      return paths.filter(path => path && path.length).map((path, idx) => {
+        const key = path.join('/');
+        if (seen.has(key)) return null;
+        seen.add(key);
+        const branch = buildBranchRecord(conv, path, idx + 1, Boolean(currentKey && key === currentKey));
+        const messages = pathToMessages(mapping, path);
+        return messages.length ? { messages, branch } : null;
+      }).filter(Boolean);
+    }
+
+    function linearizeConversation(conv) {
+      const branches = linearizeConversationBranches(conv, 'active');
+      return branches.length ? branches[0].messages : [];
+    }
+
+    function parseOpenAIJson(json, branchMode = 'active') {
       let conversations = [];
       if (Array.isArray(json)) conversations = json;
       else if (json && json.conversations && Array.isArray(json.conversations)) conversations = json.conversations;
       else if (json && json.mapping) conversations = [json];
       const all = [];
       conversations.forEach((c, i) => {
-        const messages = c.mapping ? linearizeConversation(c) : ((c.messages || []).map(normalizeMessage));
-        if (messages.length) {
-          all.push({ id: c.id || `conv-${i}`, title: c.title || 'Conversation', messages });
-        }
+        const branches = c.mapping ? linearizeConversationBranches(c, branchMode) : linearizeConversationBranches(c, 'active');
+        branches.forEach((item, branchIdx) => {
+          const branch = item.branch || {};
+          const suffix = branchMode === 'all' && branch.branch_label ? ` [${branch.branch_label}]` : '';
+          const idSuffix = branch.branch_id ? `-${branch.branch_id}` : `-${branchIdx}`;
+          all.push({
+            id: `${c.id || `conv-${i}`}${branchMode === 'all' ? idSuffix : ''}`,
+            title: `${c.title || 'Conversation'}${suffix}`,
+            messages: item.messages,
+            branch
+          });
+        });
       });
+      return all;
+    }
+
+    function isZipFile(file) {
+      const name = String(file && file.name || '').toLowerCase();
+      const type = String(file && file.type || '').toLowerCase();
+      return name.endsWith('.zip') || type.includes('zip');
+    }
+
+    async function* textChunksFromFile(file, onProgress) {
+      const reader = file.stream().getReader();
+      const decoder = new TextDecoder('utf-8');
+      let loaded = 0;
+      while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+        loaded += result.value.byteLength;
+        if (onProgress) onProgress({ loaded, total: file.size || 0 });
+        const text = decoder.decode(result.value, { stream: true });
+        if (text) yield text;
+      }
+      const tail = decoder.decode();
+      if (tail) yield tail;
+    }
+
+    async function* textChunksFromZip(file, onProgress) {
+      if (!window.fflate || !window.fflate.Unzip) {
+        throw new Error('ZIP 流式解析模块未加载，请检查网络后刷新页面。');
+      }
+
+      const queue = [];
+      let notify = null;
+      let done = false;
+      let error = null;
+      let found = false;
+      let loaded = 0;
+      const decoder = new TextDecoder('utf-8');
+
+      function wake() {
+        if (notify) {
+          notify();
+          notify = null;
+        }
+      }
+
+      function pushText(text) {
+        if (text) queue.push(text);
+        wake();
+      }
+
+      const unzip = new window.fflate.Unzip((entry) => {
+        const name = String(entry.name || entry.filename || '');
+        if (name.split('/').pop() !== 'conversations.json') return;
+        found = true;
+        entry.ondata = (err, data, final) => {
+          if (err) {
+            error = err;
+            wake();
+            return;
+          }
+          if (data && data.length) {
+            pushText(decoder.decode(data, { stream: !final }));
+          }
+          if (final) {
+            pushText(decoder.decode());
+            done = true;
+            wake();
+          }
+        };
+        entry.start();
+      });
+
+      (async () => {
+        try {
+          const reader = file.stream().getReader();
+          while (true) {
+            const result = await reader.read();
+            if (result.done) break;
+            loaded += result.value.byteLength;
+            if (onProgress) onProgress({ loaded, total: file.size || 0 });
+            unzip.push(result.value, false);
+          }
+          unzip.push(new Uint8Array(0), true);
+          if (!found) {
+            error = new Error('这个 zip 里没有找到 conversations.json。');
+            wake();
+          }
+        } catch (err) {
+          error = err;
+          wake();
+        }
+      })();
+
+      while (!done || queue.length) {
+        if (error) throw error;
+        if (queue.length) {
+          yield queue.shift();
+          continue;
+        }
+        await new Promise(resolve => { notify = resolve; });
+      }
+    }
+
+    async function* iterJsonArrayItemsFromChunks(chunks) {
+      let buf = '';
+      let started = false;
+      let itemStart = -1;
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      let scanPos = 0;
+
+      for await (const chunk of chunks) {
+        buf += chunk;
+        if (!started) {
+          const arrayStart = buf.indexOf('[');
+          if (arrayStart === -1) {
+            if (buf.length > 1024 * 1024) buf = buf.slice(-128);
+            continue;
+          }
+          buf = buf.slice(arrayStart + 1);
+          started = true;
+          scanPos = 0;
+        }
+
+        for (let i = scanPos; i < buf.length; i += 1) {
+          const ch = buf[i];
+
+          if (itemStart < 0) {
+            if (ch === ']') return;
+            if (ch === ',' || /\s/.test(ch)) continue;
+            if (ch !== '{' && ch !== '[') {
+              throw new Error('conversations.json 格式不符合预期：数组项不是对象。');
+            }
+            itemStart = i;
+            depth = 0;
+            inString = false;
+            escaped = false;
+          }
+
+          if (inString) {
+            if (escaped) escaped = false;
+            else if (ch === '\\') escaped = true;
+            else if (ch === '"') inString = false;
+            continue;
+          }
+
+          if (ch === '"') {
+            inString = true;
+          } else if (ch === '{' || ch === '[') {
+            depth += 1;
+          } else if (ch === '}' || ch === ']') {
+            depth -= 1;
+            if (depth === 0) {
+              const itemText = buf.slice(itemStart, i + 1);
+              yield JSON.parse(itemText);
+              buf = buf.slice(i + 1);
+              i = -1;
+              scanPos = 0;
+              itemStart = -1;
+            }
+          }
+        }
+        scanPos = buf.length;
+
+        if (itemStart < 0 && buf.length > 1024 * 1024) {
+          buf = buf.slice(-1024);
+          scanPos = buf.length;
+        }
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      if (itemStart >= 0) throw new Error('conversations.json 还没读完整，文件可能损坏。');
+    }
+
+    function progressText(prefix, loaded, total, parsed) {
+      const mb = loaded ? (loaded / 1024 / 1024).toFixed(1) : '0.0';
+      const totalMb = total ? (total / 1024 / 1024).toFixed(1) : '?';
+      return `${prefix}：${mb}/${totalMb} MB，已识别 ${parsed || 0} 个窗口`;
+    }
+
+    async function parseOpenAIFile(file, branchMode, statusEl) {
+      const useStream = isZipFile(file) || Number(file.size || 0) >= STREAM_PARSE_THRESHOLD;
+      if (!useStream) {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        return parseOpenAIJson(json, branchMode);
+      }
+
+      const all = [];
+      let parsed = 0;
+      const chunks = isZipFile(file)
+        ? textChunksFromZip(file, p => {
+          statusEl.textContent = progressText('正在读取 zip', p.loaded, p.total, parsed);
+        })
+        : textChunksFromFile(file, p => {
+          statusEl.textContent = progressText('正在读取 JSON', p.loaded, p.total, parsed);
+        });
+
+      for await (const item of iterJsonArrayItemsFromChunks(chunks)) {
+        const convs = parseOpenAIJson(item, branchMode);
+        all.push(...convs);
+        parsed += 1;
+        if (parsed % 20 === 0) {
+          statusEl.textContent = `正在整理窗口：已识别 ${parsed} 个窗口 / ${all.length} 条分支`;
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
       return all;
     }
 
@@ -2351,14 +2659,13 @@
       const status = document.getElementById('status');
       status.textContent = '';
       if (!file) {
-        status.textContent = '请先上传 conversations.json';
+        status.textContent = '请先上传 ChatGPT 导出文件';
         return;
       }
       try {
         status.textContent = '正在解析…';
-        const text = await file.text();
-        const json = JSON.parse(text);
-        allConversations = parseOpenAIJson(json);
+        const branchMode = document.getElementById('branchMode').value || 'active';
+        allConversations = await parseOpenAIFile(file, branchMode, status);
         monthIndex = buildMonthIndex(allConversations);
         selectedMonth = null;
         selectedConvIds = new Set();
@@ -2369,7 +2676,7 @@
         renderMonths();
         renderWindows();
         renderPreview();
-        status.textContent = `加载完成：${allConversations.length} 个窗口`;
+        status.textContent = `加载完成：${allConversations.length} 个窗口/分支`;
       } catch (e) {
         status.textContent = '解析失败：' + e.message;
       }
