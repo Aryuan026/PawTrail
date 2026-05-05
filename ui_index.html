@@ -427,7 +427,7 @@
       <div class="field">
         <label>上传 ChatGPT 导出文件</label>
         <input id="convFile" type="file" accept="application/json,application/zip,.json,.zip" />
-        <div class="help-note">可以直接上传解压后的 conversations.json；如果用户手里只有 ChatGPT 导出的 zip，也可以直接上传。900MB 级 JSON 会自动用流式解析。</div>
+        <div class="help-note">可以直接上传解压后的 conversations.json；如果用户手里只有 ChatGPT 导出的 zip，也可以直接上传。超大 JSON 会自动用流式解析。</div>
       </div>
       <div class="field">
         <label>ChatGPT 分支处理</label>
@@ -575,7 +575,7 @@
     </section>
   </main>
   <footer>
-    PawTrail 说明：几百 MB 到 900MB 的 conversations.json 会自动进入流式解析；解析完成后再按月份筛选、分批导出与审阅。
+    PawTrail 说明：体积较大的 conversations.json 会自动进入流式解析；解析完成后再按月份筛选、分批导出与审阅。
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
